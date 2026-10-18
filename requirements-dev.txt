@@ -1,15 +1,11 @@
-# for GHA
-requests
-aiohttp
-aiofiles
-typing-extensions
-# rly dev
-ruff==0.1.6
-coverage
+# Runtime dependencies of the organizer CLI
+-e .[async]
+mutagen
+python-dotenv
+
+# Test tooling (the same set the upstream library uses)
 pytest
 pytest-cov
-codecov
+orjson
+pydantic-core
 ujson
-importlib_metadata
-atomicwrites
-mutagen
