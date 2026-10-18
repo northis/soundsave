@@ -38,7 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Verification
 
-- Test suite with the documented `requirements-dev.txt` setup:
+- CI: all 21 unit-test jobs pass (Linux, macOS and Windows; Python 3.8–3.14),
+  along with the ruff, pyrefly and codegen checks.
+- Local test suite with the documented `requirements-dev.txt` setup:
   `2440 passed, 8 skipped` (the skipped tests require the optional Ynison
   extras, which the organizer does not use).
 - Organizer tests: see `tests/test_organizer.py`.
@@ -47,9 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The live check also confirmed the reason for the 1.2 roadmap item: a sample of
   50 tracks returned only `mp3 192` (one track additionally had `aac 128`),
   without a 320 kbps option.
-- Note: with the optional Ynison extras installed, three upstream
-  `test_ynison_client_async.py::TestReconnect` tests are timing-flaky on the
-  local Python 3.14 environment. They do not touch the organizer code path.
 
 ## [1.0.0] - 2025-08-31
 
