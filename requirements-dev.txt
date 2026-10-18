@@ -1,7 +1,5 @@
 # Runtime dependencies of the organizer CLI
--e .[async]
-mutagen
-python-dotenv
+-e .[organizer]
 
 # Test tooling (the same set the upstream library uses)
 pytest

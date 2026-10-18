@@ -61,6 +61,10 @@ ynison = [
     "websockets>=13.0",
     "betterproto>=1.2.5,<3",
 ]
+organizer = [
+    "mutagen",
+    "python-dotenv",
+]
 
 [dependency-groups]
 test = [
