@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Yandex Music Organizer (API token version).
 
 This script is a re-implementation of `yandex_music_organizer.py` but works with an
