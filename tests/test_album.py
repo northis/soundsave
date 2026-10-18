@@ -1,4 +1,21 @@
-from yandex_music import Album
+from typing import Dict, List, Optional, Union
+
+from yandex_music import (
+    Album,
+    AlbumActionButton,
+    AlbumTrailerStatus,
+    Artist,
+    Client,
+    Cover,
+    CoverDerivedColors,
+    CustomWave,
+    Deprecation,
+    JSONType,
+    Label,
+    Pager,
+    Track,
+    TrackPosition,
+)
 
 
 class TestAlbum:
@@ -10,8 +27,8 @@ class TestAlbum:
     track_count = 3
     available = True
     available_for_premium_users = True
-    content_warning = None
-    original_release_year = None
+    content_warning: Optional[str] = None
+    original_release_year: Optional[int] = None
     genre = 'alternative'
     text_color = '#000000'
     short_description = ''
@@ -27,17 +44,17 @@ class TestAlbum:
     meta_type = 'music'
     storage_dir = '4beeac1e.a.1155208'
     og_image = 'avatars.yandex.net/get-music-content/95061/89c14a7d.a.5239478-1/%%'
-    buy = []
+    buy: List[JSONType] = []
     recent = False
     very_important = False
     available_for_mobile = True
     available_partially = False
     bests = [51241318]
-    prerolls = None
+    prerolls: Optional[List[JSONType]] = None
     year = 2019
     release_date = '2019-03-22T00:00:00+03:00'
     type = 'single'
-    regions = None
+    regions: Optional[List[str]] = None
     available_as_rbt = False
     lyrics_available = True
     remember_position = False
@@ -47,17 +64,30 @@ class TestAlbum:
     likes_count = 2
     available_regions = ['kg', 'tm', 'by', 'kz', 'md', 'ru', 'am', 'ge', 'uz', 'tj', 'il', 'az', 'ua']
     available_for_options = ['bookmate']
+    disclaimers = ['explicit', 'exclamationIcon:671a23afcec5646906723a52']
+    meta_tag_id = 'fake-meta-tag-id'
+    child_content = False
+    background_image_url = 'avatars.yandex.net/get-music-misc/12345/album-background/%%'
+    duration_sec = 200
+    has_trailer = True
+    sort_order = 'asc'
 
     def test_expected_values(
         self,
-        album,
-        artist_without_tracks,
-        label,
-        track_position,
-        track_without_albums,
-        album_without_nested_albums,
-        deprecation,
-    ):
+        album: Album,
+        artist_without_tracks: Artist,
+        label: Union[Label, str],
+        track_position: TrackPosition,
+        track_without_albums: Track,
+        album_without_nested_albums: Album,
+        deprecation: Deprecation,
+        album_action_button: AlbumActionButton,
+        cover: Cover,
+        cover_derived_colors: CoverDerivedColors,
+        custom_wave: CustomWave,
+        album_trailer_status: AlbumTrailerStatus,
+        pager: Pager,
+    ) -> None:
         assert album.id == self.id
         assert album.error == self.error
         assert album.title == self.title
@@ -103,20 +133,48 @@ class TestAlbum:
         assert album.deprecation == deprecation
         assert album.available_regions == self.available_regions
         assert album.available_for_options == self.available_for_options
+        assert album.disclaimers == self.disclaimers
+        assert album.action_button == album_action_button
+        assert album.cover == cover
+        assert album.derived_colors == cover_derived_colors
+        assert album.meta_tag_id == self.meta_tag_id
+        assert album.child_content == self.child_content
+        assert album.background_image_url == self.background_image_url
+        assert album.custom_wave == custom_wave
+        assert album.duration_sec == self.duration_sec
+        assert album.has_trailer == self.has_trailer
+        assert album.trailer == album_trailer_status
+        assert album.pager == pager
+        assert album.sort_order == self.sort_order
 
-    def test_de_json_none(self, client):
+    def test_de_json_none(self, client: Client) -> None:
         assert Album.de_json({}, client) is None
 
-    def test_de_list_none(self, client):
+    def test_de_list_none(self, client: Client) -> None:
         assert Album.de_list([], client) == []
 
-    def test_de_json_required(self, client):
-        json_dict = {'id': self.id}
-        Album.de_json(json_dict, client)
+    def test_de_json_required(self, client: Client) -> None:
+        json_dict: Dict[str, JSONType] = {'id': self.id}
+        _ = Album.de_json(json_dict, client)
 
-    def test_de_json_all(self, client, artist, label, track_position, track, album_without_nested_albums, deprecation):
+    def test_de_json_all(
+        self,
+        client: Client,
+        artist: Artist,
+        label: Union[Label, str],
+        track_position: TrackPosition,
+        track: Track,
+        album_without_nested_albums: Album,
+        deprecation: Deprecation,
+        album_action_button: AlbumActionButton,
+        cover: Cover,
+        cover_derived_colors: CoverDerivedColors,
+        custom_wave: CustomWave,
+        album_trailer_status: AlbumTrailerStatus,
+        pager: Pager,
+    ) -> None:
         labels = [label] if isinstance(label, str) else [label.to_dict()]
-        json_dict = {
+        json_dict: Dict[str, JSONType] = {
             'id': self.id,
             'error': self.error,
             'title': self.title,
@@ -163,8 +221,22 @@ class TestAlbum:
             'deprecation': deprecation.to_dict(),
             'available_regions': self.available_regions,
             'available_for_options': self.available_for_options,
+            'disclaimers': self.disclaimers,
+            'action_button': album_action_button.to_dict(),
+            'cover': cover.to_dict(),
+            'derivedColors': cover_derived_colors.to_dict(),
+            'metaTagId': self.meta_tag_id,
+            'childContent': self.child_content,
+            'backgroundImageUrl': self.background_image_url,
+            'customWave': custom_wave.to_dict(),
+            'durationSec': self.duration_sec,
+            'hasTrailer': self.has_trailer,
+            'trailer': album_trailer_status.to_dict(),
+            'pager': pager.to_dict(),
+            'sortOrder': self.sort_order,
         }
         album = Album.de_json(json_dict, client)
+        assert album is not None
 
         assert album.id == self.id
         assert album.error == self.error
@@ -211,8 +283,21 @@ class TestAlbum:
         assert album.deprecation == deprecation
         assert album.available_regions == self.available_regions
         assert album.available_for_options == self.available_for_options
+        assert album.disclaimers == self.disclaimers
+        assert album.action_button == album_action_button
+        assert album.cover == cover
+        assert album.derived_colors == cover_derived_colors
+        assert album.meta_tag_id == self.meta_tag_id
+        assert album.child_content == self.child_content
+        assert album.background_image_url == self.background_image_url
+        assert album.custom_wave == custom_wave
+        assert album.duration_sec == self.duration_sec
+        assert album.has_trailer == self.has_trailer
+        assert album.trailer == album_trailer_status
+        assert album.pager == pager
+        assert album.sort_order == self.sort_order
 
-    def test_equality(self, artist, label):
+    def test_equality(self) -> None:
         a = Album(self.id)
         b = Album(10)
         c = Album(self.id)

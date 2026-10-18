@@ -1,7 +1,5 @@
-yandex\_music.playlist.contest
-==============================
+Contest
+=======
 
 .. automodule:: yandex_music.playlist.contest
    :members:
-   :undoc-members:
-   :show-inheritance:

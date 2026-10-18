@@ -1,13 +1,12 @@
+"""Операции изменения плейлиста."""
+
 from enum import Enum
-from typing import List, Union
+from typing import Dict, List, Optional, Union
 
-ujson = False
-try:
-    import ujson as json
+from yandex_music.utils.json_backend import JsonBackend, get_default_json_backend
 
-    ujson = True
-except ImportError:
-    import json
+TrackIdData = Dict[str, Union[str, int]]
+OperationData = Dict[str, Union[str, int, List[TrackIdData]]]
 
 
 class Operation(Enum):
@@ -34,15 +33,20 @@ class Difference:
     """
 
     def __init__(self) -> None:
-        self.operations = []
+        self.operations: List[OperationData] = []
 
-    def to_json(self) -> str:
+    def to_json(self, json_backend: Optional[JsonBackend] = None) -> str:
         """Сериализация всех операций над плейлистом.
+
+        Args:
+            json_backend (:obj:`yandex_music.utils.json_backend.JsonBackend`, optional): JSON библиотека.
+                По умолчанию используется глобальная.
 
         Returns:
             :obj:`str`: Сформированное тело для запроса.
         """
-        return json.dumps(self.operations, ensure_ascii=not ujson)
+        backend = json_backend if json_backend is not None else get_default_json_backend()
+        return backend.dumps(self.operations)
 
     def add_delete(self, from_: int, to: int) -> 'Difference':
         """Добавление операции удаления.
@@ -57,12 +61,12 @@ class Difference:
         Returns:
             :obj:`yandex_music.utils.difference.Difference`: Набор операций над плейлистом.
         """
-        operation = {'op': Operation.DELETE.value, 'from': from_, 'to': to}
+        operation: OperationData = {'op': Operation.DELETE.value, 'from': from_, 'to': to}
 
         self.operations.append(operation)
         return self
 
-    def add_insert(self, at: int, tracks: Union[dict, List[dict]]) -> 'Difference':
+    def add_insert(self, at: int, tracks: Union[TrackIdData, List[TrackIdData]]) -> 'Difference':
         """Добавление операции вставки.
 
         Note:
@@ -75,20 +79,18 @@ class Difference:
         Returns:
             :obj:`yandex_music.utils.difference.Difference`: Набор операций над плейлистом.
         """
-        # TODO (MarshalX) принимать TrackId, а так же строку и сплитить её по ":".
+        # TODO(MarshalX): принимать TrackId, а так же строку и сплитить её по ":".
         #  При отсутствии album_id кидать исключение.
         #  https://github.com/MarshalX/yandex-music-api/issues/558
         if not isinstance(tracks, list):
             tracks = [tracks]
 
-        operation = {'op': Operation.INSERT.value, 'at': at, 'tracks': []}
+        operation_tracks: List[TrackIdData] = []
+        operation: OperationData = {'op': Operation.INSERT.value, 'at': at, 'tracks': operation_tracks}
 
-        for track in tracks:
-            # TODO (MarshalX) replace to normal TrackId object
-            #  https://github.com/MarshalX/yandex-music-api/issues/558
-            track = type('TrackId', (), track)
-
-            operation['tracks'].append({'id': track.id, 'albumId': track.album_id})
+        # TODO(MarshalX): replace to normal TrackId object
+        #  https://github.com/MarshalX/yandex-music-api/issues/558
+        operation_tracks.extend({'id': track['id'], 'albumId': track['album_id']} for track in tracks)
 
         self.operations.append(operation)
         return self

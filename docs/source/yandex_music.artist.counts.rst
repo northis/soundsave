@@ -1,7 +1,5 @@
-yandex\_music.artist.counts
-===========================
+Counts
+======
 
 .. automodule:: yandex_music.artist.counts
    :members:
-   :undoc-members:
-   :show-inheritance:

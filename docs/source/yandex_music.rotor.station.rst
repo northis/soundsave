@@ -1,7 +1,5 @@
-yandex\_music.rotor.station
-===========================
+Station
+=======
 
 .. automodule:: yandex_music.rotor.station
    :members:
-   :undoc-members:
-   :show-inheritance:

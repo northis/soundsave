@@ -1,7 +1,5 @@
-yandex\_music.supplement.supplement
-===================================
+Supplement
+==========
 
 .. automodule:: yandex_music.supplement.supplement
    :members:
-   :undoc-members:
-   :show-inheritance:

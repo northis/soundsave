@@ -1,7 +1,5 @@
-yandex\_music.download\_info
-============================
+DownloadInfo
+============
 
 .. automodule:: yandex_music.download_info
    :members:
-   :undoc-members:
-   :show-inheritance:

@@ -1,7 +1,5 @@
-yandex\_music.album.deprecation
-===============================
+Deprecation
+===========
 
 .. automodule:: yandex_music.album.deprecation
    :members:
-   :undoc-members:
-   :show-inheritance:

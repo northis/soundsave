@@ -1,7 +1,5 @@
-yandex\_music.artist.brief\_info
-================================
+BriefInfo
+=========
 
 .. automodule:: yandex_music.artist.brief_info
    :members:
-   :undoc-members:
-   :show-inheritance:

@@ -1,11 +1,27 @@
 from dataclasses import field
 from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 
+from typing_extensions import override
+
 from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import Artist, ClientType, Deprecation, JSONType, Label, Track, TrackPosition
+    from yandex_music import (
+        AlbumActionButton,
+        AlbumTrailerStatus,
+        Artist,
+        ClientType,
+        Cover,
+        CoverDerivedColors,
+        CustomWave,
+        Deprecation,
+        JSONType,
+        Label,
+        Pager,
+        Track,
+        TrackPosition,
+    )
 
 
 @model
@@ -35,7 +51,7 @@ class Album(YandexMusicModel):
         version (:obj:`str`, optional): Дополнительная информация об альбоме.
         cover_uri (:obj:`str`, optional): Ссылка на обложку.
         content_warning (:obj:`str`, optional): Предупреждение о содержимом альбома.
-        original_release_year: TODO.
+        original_release_year (:obj:`int`, optional): Год оригинального релиза.
         genre (:obj:`str`, optional): Жанр музыки.
         text_color (:obj:`str`, optional): Цвет текста описания.
         short_description (:obj:`str`, optional): Короткое описание.
@@ -70,6 +86,19 @@ class Album(YandexMusicModel):
         deprecation (:obj:`yandex_music.Deprecation`, optional): TODO.
         available_regions (:obj:`list` из :obj:`str`, optional): Регионы, где доступен альбом.
         available_for_options (:obj:`list` из :obj:`str`, optional): Возможные опции для альбома.
+        disclaimers (:obj:`list` из :obj:`str`, optional): Список дисклеймеров альбома.
+        action_button (:obj:`yandex_music.AlbumActionButton`, optional): Кнопка-действие для перехода по ссылке.
+        cover (:obj:`yandex_music.Cover`, optional): Обложка альбома.
+        derived_colors (:obj:`yandex_music.CoverDerivedColors`, optional): Производные цвета обложки альбома.
+        meta_tag_id (:obj:`str`, optional): Идентификатор метатега альбома.
+        child_content (:obj:`bool`, optional): Является ли альбом детским контентом.
+        background_image_url (:obj:`str`, optional): Ссылка на фоновое изображение.
+        custom_wave (:obj:`yandex_music.CustomWave`, optional): Моя волна по альбому.
+        duration_sec (:obj:`int`, optional): Длительность альбома в секундах.
+        has_trailer (:obj:`bool`, optional): Есть ли у альбома трейлер.
+        trailer (:obj:`yandex_music.AlbumTrailerStatus`, optional): Доступность трейлера альбома.
+        pager (:obj:`yandex_music.Pager`, optional): Пагинатор треков.
+        sort_order (:obj:`str`, optional): Порядок сортировки треков (`asc`, `desc`).
         client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
     """
 
@@ -84,7 +113,7 @@ class Album(YandexMusicModel):
     version: Optional[str] = None
     cover_uri: Optional[str] = None
     content_warning: Optional[str] = None
-    original_release_year: Any = None
+    original_release_year: Optional[int] = None
     genre: Optional[str] = None
     text_color: Optional[str] = None
     short_description: Optional[str] = None
@@ -94,14 +123,14 @@ class Album(YandexMusicModel):
     meta_type: Optional[str] = None
     storage_dir: Optional[str] = None
     og_image: Optional[str] = None
-    buy: Optional[list] = None
+    buy: Optional[List['JSONType']] = None
     recent: Optional[bool] = None
     very_important: Optional[bool] = None
     available_for_mobile: Optional[bool] = None
     available_partially: Optional[bool] = None
     bests: Optional[List[int]] = None
     duplicates: List['Album'] = field(default_factory=list)
-    prerolls: Optional[list] = None
+    prerolls: Optional[List['JSONType']] = None
     volumes: Optional[List[List['Track']]] = None
     year: Optional[int] = None
     release_date: Optional[str] = None
@@ -119,24 +148,42 @@ class Album(YandexMusicModel):
     deprecation: Optional['Deprecation'] = None
     available_regions: Optional[List[str]] = None
     available_for_options: Optional[List[str]] = None
+    listening_finished: Optional[bool] = None
+    disclaimers: Optional[List[str]] = None
+    action_button: Optional['AlbumActionButton'] = None
+    cover: Optional['Cover'] = None
+    derived_colors: Optional['CoverDerivedColors'] = None
+    meta_tag_id: Optional[str] = None
+    child_content: Optional[bool] = None
+    background_image_url: Optional[str] = None
+    custom_wave: Optional['CustomWave'] = None
+    duration_sec: Optional[int] = None
+    has_trailer: Optional[bool] = None
+    trailer: Optional['AlbumTrailerStatus'] = None
+    pager: Optional['Pager'] = None
+    sort_order: Optional[str] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
         self._id_attrs = (self.id,)
 
     def with_tracks(self, *args: Any, **kwargs: Any) -> Optional['Album']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.albums_with_tracks(album.id, *args, **kwargs)
+        Сокращение для::
+
+            client.albums_with_tracks(album.id, *args, **kwargs)
         """
         assert isinstance(self.id, int)
         assert self.valid_client(self.client)
         return self.client.albums_with_tracks(self.id, *args, **kwargs)
 
     async def with_tracks_async(self, *args: Any, **kwargs: Any) -> Optional['Album']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.albums_with_tracks(album.id, *args, **kwargs)
+        Сокращение для::
+
+            await client.albums_with_tracks(album.id, *args, **kwargs)
         """
         assert isinstance(self.id, int)
         assert self.valid_async_client(self.client)
@@ -263,36 +310,44 @@ class Album(YandexMusicModel):
         return await self.client.request.retrieve(self.get_og_image_url(size))
 
     def like(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_albums_add(album.id, user.id *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_albums_add(album.id, user.id *args, **kwargs)
         """
         assert isinstance(self.id, int)
         assert self.valid_client(self.client)
         return self.client.users_likes_albums_add(self.id, self.client.account_uid, *args, **kwargs)
 
     async def like_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_albums_add(album.id, user.id *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_albums_add(album.id, user.id *args, **kwargs)
         """
         assert isinstance(self.id, int)
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_albums_add(self.id, self.client.account_uid, *args, **kwargs)
 
     def dislike(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_albums_remove(album.id, user.id *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_albums_remove(album.id, user.id *args, **kwargs)
         """
         assert isinstance(self.id, int)
         assert self.valid_client(self.client)
         return self.client.users_likes_albums_remove(self.id, self.client.account_uid, *args, **kwargs)
 
     async def dislike_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_albums_remove(album.id, user.id *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_albums_remove(album.id, user.id *args, **kwargs)
         """
         assert isinstance(self.id, int)
         assert self.valid_async_client(self.client)
@@ -304,9 +359,10 @@ class Album(YandexMusicModel):
         Returns:
               :obj:`list` из :obj:`str`: Имена исполнителей.
         """
-        return [i.name for i in self.artists if i.name]
+        return [i.name for i in self.artists if i.name is not None and i.name != '']
 
     @classmethod
+    @override
     def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Album']:
         """Десериализация объекта.
 
@@ -320,31 +376,25 @@ class Album(YandexMusicModel):
         if not cls.is_dict_model_data(data):
             return None
 
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Artist, Deprecation, Label, Track, TrackPosition
-
-        cls_data['artists'] = Artist.de_list(data.get('artists'), client)
+        cls_data = cls.de_nested(cls.cleanup_data(data, client), client, exclude=('volumes',))
+        from yandex_music import Label, Track
 
         # В зависимости от запроса содержимое лейблов может быть списком объектом или списком строк.
-        labels = data.get('labels')
+        labels = cls_data.get('labels')
         if cls.is_array_model_data(labels):
             cls_data['labels'] = Label.de_list(labels, client)
         elif isinstance(labels, list) and all(isinstance(label, str) for label in labels):
-            cls_data['labels'] = cast(List[str], labels)
+            cls_data['labels'] = cast('List[str]', labels)
         else:
             # Поддержка формата. Все листы [] по умолчанию вместо None даже если данных нет.
-            cls_data['labels'] = []
+            empty_labels: List[str] = []
+            cls_data['labels'] = empty_labels
 
-        cls_data['track_position'] = TrackPosition.de_json(data.get('track_position'), client)
-        cls_data['duplicates'] = Album.de_list(data.get('duplicates'), client)
-        cls_data['albums'] = Album.de_list(data.get('albums'), client)
-        cls_data['deprecation'] = Deprecation.de_json(data.get('deprecation'), client)
-
-        volumes = data.get('volumes')
+        volumes: JSONType = cls_data.get('volumes')
         if isinstance(volumes, list):
             cls_data['volumes'] = [Track.de_list(volume, client) for volume in volumes]
 
-        return cls(client=client, **cls_data)  # type: ignore
+        return cls.construct(cls_data, client)
 
     # camelCase псевдонимы
 

@@ -4,7 +4,7 @@ from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import ClientType
+    from yandex_music import ClientType, CoverDerivedColors
 
 
 @model
@@ -23,6 +23,9 @@ class Cover(YandexMusicModel):
         copyright_name (:obj:`str`, optional): Название владельца авторским правом.
         copyright_cline (:obj:`str`, optional): Владелец прав на музыку (автор текста и т.д.), а не её записи.
         error (:obj:`str`, optional): Сообщение об ошибке.
+        color (:obj:`str`, optional): Основной цвет обложки, например "#6d6e72".
+        derived_colors (:obj:`yandex_music.CoverDerivedColors`, optional): Производные цвета обложки.
+        video_url (:obj:`str`, optional): URL видео обложки.
         client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
     """
 
@@ -37,6 +40,9 @@ class Cover(YandexMusicModel):
     copyright_cline: Optional[str] = None
     prefix: Optional[str] = None
     error: Optional[str] = None
+    color: Optional[str] = None
+    derived_colors: Optional['CoverDerivedColors'] = None
+    video_url: Optional[str] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
@@ -53,7 +59,7 @@ class Cover(YandexMusicModel):
             :obj:`str`: URL адрес.
         """
         uri = self.uri
-        if not uri:
+        if uri is None or uri == '':
             assert isinstance(self.items_uri, list)
             uri = self.items_uri[index]
 

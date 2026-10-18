@@ -1,7 +1,5 @@
-yandex\_music.playlist.custom\_wave
-===================================
+CustomWave
+==========
 
 .. automodule:: yandex_music.playlist.custom_wave
    :members:
-   :undoc-members:
-   :show-inheritance:

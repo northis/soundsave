@@ -1,7 +1,5 @@
-yandex\_music.search.search\_result
-===================================
+SearchResult
+============
 
 .. automodule:: yandex_music.search.search_result
    :members:
-   :undoc-members:
-   :show-inheritance:

@@ -1,16 +1,23 @@
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 
+from typing_extensions import override
+
 from yandex_music import YandexMusicModel
 from yandex_music.exceptions import IdMissingError
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
     from yandex_music import (
+        AlbumActionButton,
         ArtistAlbums,
+        ArtistDonationInfo,
         ArtistTracks,
+        ArtistTrailerStatus,
         ClientType,
+        ContentRestrictions,
         Counts,
         Cover,
+        CoverDerivedColors,
         Description,
         JSONType,
         Link,
@@ -55,6 +62,14 @@ class Artist(YandexMusicModel):
         init_date (:obj:`str`, optional): Дата начала в формате YYYY-MM-DD или YYYY.
         end_date (:obj:`str`, optional): Дата окончания в формате YYYY-MM-DD или YYYY.
         ya_money_id (:obj:`str`): Номер кошеляка Яндекс.Деньги TODO.
+        disclaimers (:obj:`list` из :obj:`str`, optional): Дисклеймеры, например ["foreignAgent"].
+        content_restrictions (:obj:`yandex_music.ContentRestrictions`, optional): Ограничения контента.
+        cutout_cover (:obj:`yandex_music.Cover`, optional): Вырезанная обложка артиста.
+        derived_colors (:obj:`yandex_music.CoverDerivedColors`, optional): Производные цвета обложки артиста.
+        action_button (:obj:`yandex_music.AlbumActionButton`, optional): Кнопка-действие для перехода по ссылке.
+        donation_info (:obj:`yandex_music.ArtistDonationInfo`, optional): Ссылка на донат артисту.
+        has_trailer (:obj:`bool`, optional): Есть ли у артиста трейлер.
+        trailer (:obj:`yandex_music.ArtistTrailerStatus`, optional): Доступность трейлера артиста.
         client (:obj:`yandex_music.Client`): Клиент Yandex Music.
     """
 
@@ -88,6 +103,14 @@ class Artist(YandexMusicModel):
     init_date: Optional[str] = None
     end_date: Optional[str] = None
     ya_money_id: Optional[str] = None
+    disclaimers: Optional[List[str]] = None
+    content_restrictions: Optional['ContentRestrictions'] = None
+    cutout_cover: Optional['Cover'] = None
+    derived_colors: Optional['CoverDerivedColors'] = None
+    action_button: Optional['AlbumActionButton'] = None
+    donation_info: Optional['ArtistDonationInfo'] = None
+    has_trailer: Optional[bool] = None
+    trailer: Optional['ArtistTrailerStatus'] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
@@ -233,41 +256,51 @@ class Artist(YandexMusicModel):
         return await self.client.request.retrieve(self.get_op_image_url(size))
 
     def like(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_artists_add(artist.id_required, user.id *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_artists_add(artist.id_required, user.id *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.users_likes_artists_add(self.id_required, self.client.account_uid, *args, **kwargs)
 
     async def like_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_artists_add(artist.id_required, user.id *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_artists_add(artist.id_required, user.id *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_artists_add(self.id_required, self.client.account_uid, *args, **kwargs)
 
     def dislike(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_artists_remove(artist.id_required, user.id *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_artists_remove(artist.id_required, user.id *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.users_likes_artists_remove(self.id_required, self.client.account_uid, *args, **kwargs)
 
     async def dislike_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_artists_remove(artist.id_required, user.id *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_artists_remove(artist.id_required, user.id *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_artists_remove(self.id_required, self.client.account_uid, *args, **kwargs)
 
     def get_tracks(self, page: int = 0, page_size: int = 20, *args: Any, **kwargs: Any) -> Optional['ArtistTracks']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.artists_tracks(artist.id_required, page, page_size, *args, **kwargs)
+        Сокращение для::
+
+            client.artists_tracks(artist.id_required, page, page_size, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.artists_tracks(self.id_required, page, page_size, *args, **kwargs)
@@ -275,9 +308,11 @@ class Artist(YandexMusicModel):
     async def get_tracks_async(
         self, page: int = 0, page_size: int = 20, *args: Any, **kwargs: Any
     ) -> Optional['ArtistTracks']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.artists_tracks(artist.id_required, page, page_size, *args, **kwargs)
+        Сокращение для::
+
+            await client.artists_tracks(artist.id_required, page, page_size, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.artists_tracks(self.id_required, page, page_size, *args, **kwargs)
@@ -285,9 +320,11 @@ class Artist(YandexMusicModel):
     def get_albums(
         self, page: int = 0, page_size: int = 20, sort_by: str = 'year', *args: Any, **kwargs: Any
     ) -> Optional['ArtistAlbums']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.artists_direct_albums(artist.id_required, page, page_size, sort_by, *args, **kwargs)
+        Сокращение для::
+
+            client.artists_direct_albums(artist.id_required, page, page_size, sort_by, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.artists_direct_albums(self.id_required, page, page_size, sort_by, *args, **kwargs)
@@ -295,14 +332,17 @@ class Artist(YandexMusicModel):
     async def get_albums_async(
         self, page: int = 0, page_size: int = 20, sort_by: str = 'year', *args: Any, **kwargs: Any
     ) -> Optional['ArtistAlbums']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.artists_direct_albums(artist.id_required, page, page_size, sort_by, *args, **kwargs)
+        Сокращение для::
+
+            await client.artists_direct_albums(artist.id_required, page, page_size, sort_by, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.artists_direct_albums(self.id_required, page, page_size, sort_by, *args, **kwargs)
 
     @classmethod
+    @override
     def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Artist']:
         """Десериализация объекта.
 
@@ -316,31 +356,23 @@ class Artist(YandexMusicModel):
         if not cls.is_dict_model_data(data):
             return None
 
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Counts, Cover, Description, Link, Ratings, Track
-
-        cls_data['cover'] = Cover.de_json(data.get('cover'), client)
-        cls_data['ratings'] = Ratings.de_json(data.get('ratings'), client)
-        cls_data['counts'] = Counts.de_json(data.get('counts'), client)
-        cls_data['links'] = Link.de_list(data.get('links'), client)
-        cls_data['popular_tracks'] = Track.de_list(data.get('popular_tracks'), client)
-        cls_data['description'] = Description.de_json(data.get('description'), client)
+        cls_data = cls.de_nested(cls.cleanup_data(data, client), client)
 
         # Мне всё равно как в яндухе на клиентах солвят свой бэковский костыль
-        decomposed = data.get('decomposed')
+        decomposed = cls_data.get('decomposed')
         if isinstance(decomposed, list):
-            decomposed_items: List[Union[str, 'Artist']] = []
+            decomposed_items: List[Union[str, Artist]] = []
             for part in decomposed:
                 if isinstance(part, str):
                     decomposed_items.append(part)
                 elif isinstance(part, dict):
                     artist = Artist.de_json(part, client)
-                    if artist:
+                    if artist is not None:
                         decomposed_items.append(artist)
 
             cls_data['decomposed'] = decomposed_items
 
-        return cls(client=client, **cls_data)  # type: ignore
+        return cls.construct(cls_data, client)
 
     # camelCase псевдонимы
 

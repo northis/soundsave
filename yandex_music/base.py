@@ -1,36 +1,126 @@
-import dataclasses
-import keyword
-import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
+"""Базовые классы."""
 
-from typing_extensions import Self, TypeGuard
+import dataclasses
+import sys
+from types import MappingProxyType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    FrozenSet,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+    get_type_hints,
+)
+
+from typing_extensions import Self, TypeGuard, get_args, get_origin
 
 from yandex_music.utils import model
+from yandex_music.utils.normalize import RESERVED_NAMES, _normalize_key
+from yandex_music.utils.schema_mismatch import report_schema_mismatch
 
 if TYPE_CHECKING:
     from yandex_music import Client, ClientAsync
+    from yandex_music._client_base import ClientBase
 
-ujson: bool = False
-try:
-    import ujson as json
-
-    ujson = True
-except ImportError:
-    import json
-
-reserved_names = keyword.kwlist
-
-logger = logging.getLogger(__name__)
-new_issue_by_template_url = 'https://bit.ly/3dsFxyH'
-
+from yandex_music.utils.json_backend import get_default_json_backend
 
 JSONType = Union[Dict[str, 'JSONType'], Sequence['JSONType'], str, int, float, bool, None]
-ClientType = Union['Client', 'ClientAsync']
+ClientType = Union['Client', 'ClientAsync', 'ClientBase']
 ModelFieldType = Union[
     Dict[str, 'ModelFieldType'], Sequence['ModelFieldType'], 'YandexMusicModel', str, int, float, bool, None
 ]
 ModelFieldMap = Dict[str, 'ModelFieldType']
 MapTypeToDeJson = Dict[str, Callable[['JSONType', 'ClientType'], Optional['YandexMusicModel']]]
+NestedConverter = Callable[[Any, 'ClientType'], Any]
+
+_nested_plans: Dict[type, List[Tuple[str, NestedConverter]]] = {}
+_required_fields: Dict[type, Tuple[str, ...]] = {}
+_annotations_namespace: Dict[str, Any] = {}
+
+
+def _get_annotations_namespace() -> Dict[str, Any]:
+    if len(_annotations_namespace) == 0:
+        import yandex_music
+        from yandex_music._client_base import ClientBase
+
+        _annotations_namespace.update(vars(yandex_music))
+        _annotations_namespace['ClientBase'] = ClientBase
+
+    return _annotations_namespace
+
+
+def _unwrap_optional(type_: Any) -> Any:
+    if get_origin(type_) is Union:
+        args = [arg for arg in get_args(type_) if arg is not type(None)]
+        return args[0] if len(args) == 1 else None
+
+    return type_
+
+
+def _de_nested_list(converter: NestedConverter) -> NestedConverter:
+    def convert(value: Any, client: 'ClientType') -> List[Any]:
+        if not isinstance(value, list):
+            return []
+        return [converter(item, client) for item in cast('List[Any]', value)]
+
+    return convert
+
+
+def _de_nested_dict(converter: NestedConverter) -> NestedConverter:
+    def convert(value: Any, client: 'ClientType') -> Dict[str, Any]:
+        if not isinstance(value, dict):
+            return {}
+        result: Dict[str, Any] = {}
+        for key, item in cast('Dict[str, Any]', value).items():
+            converted = converter(item, client)
+            if converted is not None:
+                result[key] = converted
+        return result
+
+    return convert
+
+
+def _build_nested_converter(type_: Any) -> Optional[NestedConverter]:
+    type_ = _unwrap_optional(type_)
+    if isinstance(type_, type) and issubclass(type_, YandexMusicModel):
+        return type_.de_json
+
+    origin = get_origin(type_)
+    if origin is list:
+        (item_type,) = get_args(type_)
+        item_type = _unwrap_optional(item_type)
+        if isinstance(item_type, type) and issubclass(item_type, YandexMusicModel):
+            return item_type.de_list
+        item_converter = _build_nested_converter(item_type)
+        return _de_nested_list(item_converter) if item_converter is not None else None
+
+    if origin is dict:
+        _, value_type = get_args(type_)
+        value_converter = _build_nested_converter(value_type)
+        return _de_nested_dict(value_converter) if value_converter is not None else None
+
+    return None
+
+
+class CleanedData(Dict[str, Any]):
+    """Данные после :meth:`YandexMusicModel.cleanup_data`.
+
+    Attributes:
+        unknown_fields (:obj:`frozenset` из :obj:`str`): Поля от API, которых нет в модели. Заполняются только при
+            включённом ``report_unknown_fields`` и попадают в общий отчёт в :meth:`YandexMusicModel.construct`.
+        unknown_values (:obj:`Mapping`): Значения неизвестных полей, для описания их структуры в отчёте.
+    """
+
+    unknown_fields: FrozenSet[str] = frozenset()
+    unknown_values: Mapping[str, Any] = MappingProxyType({})
 
 
 class YandexMusicObject:
@@ -47,17 +137,8 @@ class YandexMusicModel(YandexMusicObject):
     def __repr__(self) -> str:
         return str(self)
 
-    def __getitem__(self, item: str) -> Any:
+    def __getitem__(self, item: Any) -> Any:
         return self.__dict__[item]
-
-    @staticmethod
-    def report_unknown_fields_callback(klass: type, unknown_fields: JSONType) -> None:
-        """Обратный вызов для обработки неизвестных полей."""
-        logger.warning(
-            f'Found unknown fields received from API! Please copy warn message '
-            f'and send to {new_issue_by_template_url} (GitHub issue), thank you!'
-        )
-        logger.warning(f'Type: {klass.__module__}.{klass.__name__}; fields: {unknown_fields}')
 
     @staticmethod
     def is_dict_model_data(data: JSONType) -> TypeGuard[Dict[str, JSONType]]:
@@ -112,46 +193,155 @@ class YandexMusicModel(YandexMusicObject):
         return bool(data) and isinstance(data, list) and all(isinstance(item, dict) for item in data)
 
     @classmethod
-    def cleanup_data(cls, data: JSONType, client: Optional['ClientType']) -> ModelFieldMap:
-        """Удаляет незадекларированные поля для текущей модели из сырых данных.
+    def cleanup_data(cls, data: JSONType, client: Optional['ClientType']) -> CleanedData:
+        """Нормализует ключи и удаляет незадекларированные поля для текущей модели из сырых данных.
 
         Note:
-            Фильтрует только словарь поле:значение. Иначе вернёт пустой :obj:`dict`.
+            Нормализация ключей (camelCase → snake_case) выполняется лениво на текущем уровне,
+            без рекурсивного обхода вложенных структур. Фильтрует только словарь поле:значение.
+            Иначе вернёт пустой :obj:`dict`.
+
+            Неизвестные поля не сообщаются здесь, а сохраняются в ``unknown_fields`` результата,
+            чтобы :meth:`construct` отправил один отчёт вместе с отсутствующими полями.
 
         Args:
             data (:obj:`JSONType`): Поля и значения десериализуемого объекта.
             client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
 
         Returns:
-            :obj:`ModelFieldMap`: Отфильтрованные данные.
+            :obj:`yandex_music.base.CleanedData`: Отфильтрованные данные с нормализованными ключами.
         """
+        result = CleanedData()
         if not YandexMusicModel.is_dict_model_data(data):
-            return {}
+            return result
 
-        data = data.copy()
-
-        fields = {f.name for f in dataclasses.fields(cls)}
-
-        cleaned_data: Dict[str, JSONType] = {}
-        unknown_data: Dict[str, JSONType] = {}
+        known = cls.__dataclass_fields__
+        report = client is not None and client.report_unknown_fields
+        unknown_values: Optional[Dict[str, Any]] = {} if report else None
 
         for k, v in data.items():
-            if k in fields:
-                cleaned_data[k] = v
-            else:
-                unknown_data[k] = v
+            nk = _normalize_key(k)
+            if nk in known:
+                result[nk] = v
+            elif unknown_values is not None:
+                unknown_values[nk] = v
 
-        if client and client.report_unknown_fields and unknown_data:
-            cls.report_unknown_fields_callback(cls, unknown_data)
+        if unknown_values is not None and len(unknown_values) > 0:
+            result.unknown_fields = frozenset(unknown_values)
+            result.unknown_values = unknown_values
 
-        return cleaned_data
+        return result
+
+    @classmethod
+    def nested_plan(cls) -> List[Tuple[str, NestedConverter]]:
+        """Построение плана десериализации вложенных объектов по аннотациям полей.
+
+        Note:
+            Учитываются поля вида ``Model``, ``List[Model]``, ``Dict[str, Model]`` и их вложенные
+            комбинации, обёрнутые в ``Optional``. Остальные поля (примитивы, ``Union`` нескольких
+            типов, ``Any``) остаются без изменений. План строится один раз на класс и кешируется.
+
+        Returns:
+            :obj:`list` из :obj:`tuple`: Пары из имени поля и функции его десериализации.
+        """
+        cached = _nested_plans.get(cls)
+        if cached is not None:
+            return cached
+
+        hints = get_type_hints(cls, vars(sys.modules[cls.__module__]), _get_annotations_namespace())
+        plan: List[Tuple[str, NestedConverter]] = []
+        for name in cls.__dataclass_fields__:
+            if name == 'client':
+                continue
+            converter = _build_nested_converter(hints.get(name))
+            if converter is not None:
+                plan.append((name, converter))
+
+        _nested_plans[cls] = plan
+        return plan
+
+    @classmethod
+    def required_fields(cls) -> Tuple[str, ...]:
+        """Обязательные поля модели (без значения по умолчанию).
+
+        Note:
+            Список строится один раз на класс и кешируется.
+
+        Returns:
+            :obj:`tuple` из :obj:`str`: Имена обязательных полей.
+        """
+        cached = _required_fields.get(cls)
+        if cached is not None:
+            return cached
+
+        required = tuple(
+            f.name
+            for f in dataclasses.fields(cls)
+            if f.name != 'client' and f.default is dataclasses.MISSING and f.default_factory is dataclasses.MISSING
+        )
+        _required_fields[cls] = required
+        return required
+
+    @classmethod
+    def construct(cls, cls_data: Dict[str, Any], client: Optional['ClientType']) -> Self:
+        """Создание объекта из подготовленных данных без падения на отсутствующих полях.
+
+        Note:
+            Обязательные поля, которые не пришли от API или равны null, заполняются ``None``.
+            Об отсутствующих и неизвестных полях отправляется один общий отчёт
+            (см. :func:`yandex_music.utils.schema_mismatch.report_schema_mismatch`).
+            В строгом режиме клиента при отсутствии обязательных полей вызывается исключение.
+
+        Args:
+            cls_data (:obj:`dict`): Данные после :meth:`cleanup_data` и :meth:`de_nested`.
+            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
+
+        Returns:
+            :obj:`yandex_music.YandexMusicModel`: Созданный объект.
+
+        Raises:
+            :class:`yandex_music.exceptions.SchemaMismatchError`: В строгом режиме при отсутствии обязательных полей.
+        """
+        cleaned = cls_data if isinstance(cls_data, CleanedData) else CleanedData()
+        missing = [name for name in cls.required_fields() if cls_data.get(name) is None]
+        if len(missing) > 0 or len(cleaned.unknown_fields) > 0:
+            report_schema_mismatch(cls, client, missing, cleaned.unknown_fields, cleaned.unknown_values)
+
+        for name in missing:
+            cls_data[name] = None
+
+        cls_data['client'] = client
+        return cls(**cls_data)
+
+    @classmethod
+    def de_nested(cls, cls_data: Dict[str, Any], client: 'ClientType', exclude: Collection[str] = ()) -> Dict[str, Any]:
+        """Десериализация вложенных объектов в очищенных данных.
+
+        Note:
+            Используется в переопределённом :meth:`de_json`, когда часть полей требует особой обработки.
+            Такие поля передаются в ``exclude`` и обрабатываются вручную.
+
+        Args:
+            cls_data (:obj:`dict`): Данные после :meth:`cleanup_data`.
+            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
+            exclude (:obj:`Collection` из :obj:`str`, optional): Поля, которые не нужно обрабатывать.
+
+        Returns:
+            :obj:`dict`: Те же данные с десериализованными вложенными объектами.
+        """
+        for name, converter in cls.nested_plan():
+            if name not in exclude:
+                cls_data[name] = converter(cls_data.get(name), client)
+
+        return cls_data
 
     @classmethod
     def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional[Self]:
         """Десериализация объекта.
 
         Note:
-            Переопределяется в дочерних классах когда есть вложенные объекты.
+            Вложенные объекты десериализуются автоматически по аннотациям полей (см. :meth:`nested_plan`).
+            Переопределяется в дочерних классах только для полей с особой логикой.
 
         Args:
             data (:obj:`JSONType`): Поля и значения десериализуемого объекта.
@@ -163,7 +353,7 @@ class YandexMusicModel(YandexMusicObject):
         if not cls.is_dict_model_data(data):
             return None
 
-        return cls(client=client, **cls.cleanup_data(data, client))
+        return cls.construct(cls.de_nested(cls.cleanup_data(data, client), client), client)
 
     @classmethod
     def de_list(cls, data: JSONType, client: 'ClientType') -> Sequence[Self]:
@@ -181,11 +371,16 @@ class YandexMusicModel(YandexMusicObject):
         Returns:
             :obj:`list` из :obj:`yandex_music.YandexMusicModel`: Список десериализованных объектов.
         """
-        if not cls.is_array_model_data(data):
+        if not isinstance(data, list) or len(data) == 0:
             return []
 
-        items = [cls.de_json(item, client) for item in data]
-        return [item for item in items if item is not None]
+        result: List[Self] = []
+        for item in data:
+            if isinstance(item, dict):
+                obj = cls.de_json(item, client)
+                if obj is not None:
+                    result.append(obj)
+        return result
 
     def to_json(self, for_request: bool = False) -> str:
         """Сериализация объекта.
@@ -193,10 +388,16 @@ class YandexMusicModel(YandexMusicObject):
         Args:
             for_request (:obj:`bool`): Подготовить ли объект для отправки в теле запроса.
 
+        Note:
+            Используется JSON библиотека клиента объекта, а при его отсутствии глобальная.
+
         Returns:
             :obj:`str`: Сериализованный в JSON объект.
         """
-        return json.dumps(self.to_dict(for_request), ensure_ascii=not ujson)
+        client = getattr(self, 'client', None)
+        if self.valid_client(client) or self.valid_async_client(client):
+            return client.request.json_backend.dumps(self.to_dict(for_request))
+        return get_default_json_backend().dumps(self.to_dict(for_request))
 
     def to_dict(self, for_request: bool = False) -> JSONType:
         """Рекурсивная сериализация объекта.
@@ -213,7 +414,7 @@ class YandexMusicModel(YandexMusicObject):
             :obj:`dict`: Сериализованный в dict объект.
         """
 
-        def parse(val: Union['YandexMusicModel', JSONType]) -> Any:  # noqa: ANN401
+        def parse(val: Union['YandexMusicModel', JSONType]) -> JSONType:
             if isinstance(val, YandexMusicModel):
                 return val.to_dict(for_request)
             if isinstance(val, list):
@@ -227,29 +428,28 @@ class YandexMusicModel(YandexMusicObject):
         data.pop('_id_attrs', None)
 
         if for_request:
-            for k, v in data.copy().items():
+            new_data: Dict[str, Any] = {}
+            for k, v in data.items():
                 camel_case = ''.join(word.title() for word in k.split('_'))
                 camel_case = camel_case[0].lower() + camel_case[1:]
-
-                data.pop(k)
-                data.update({camel_case: v})
+                new_data[camel_case] = v
+            data = new_data
         else:
-            for k, v in data.copy().items():
-                if k.lower() in reserved_names:
-                    data.pop(k)
-                    data.update({f'{k}_': v})
+            for k in list(data):
+                if k in RESERVED_NAMES:
+                    data[f'{k}_'] = data.pop(k)
 
         return parse(data)
 
-    def _get_id_attrs(self) -> Tuple[str]:
+    def _get_id_attrs(self) -> Tuple[object, ...]:
         """Получение ключевых атрибутов объекта.
 
         Returns:
             :obj:`tuple`: Ключевые атрибуты объекта для сравнения.
         """
-        return cast(Tuple[str], getattr(self, '_id_attrs', ()))
+        return cast('Tuple[object, ...]', getattr(self, '_id_attrs', ()))
 
-    def __eq__(self, other: Any) -> bool:  # noqa: ANN401
+    def __eq__(self, other: object) -> bool:
         """Проверка на равенство двух объектов.
 
         Note:
@@ -260,7 +460,7 @@ class YandexMusicModel(YandexMusicObject):
         """
         if isinstance(other, self.__class__):
             return self._get_id_attrs() == other._get_id_attrs()
-        return super(YandexMusicModel, self).__eq__(other)
+        return super().__eq__(other)
 
     def __hash__(self) -> int:
         """Реализация хеш-функции на основе ключевых атрибутов.
@@ -272,8 +472,8 @@ class YandexMusicModel(YandexMusicObject):
             :obj:`int`: Хеш объекта.
         """
         id_attrs = self._get_id_attrs()
-        if not id_attrs:
-            return super(YandexMusicModel, self).__hash__()
+        if len(id_attrs) == 0:
+            return super().__hash__()
 
         frozen_attrs = tuple(frozenset(attr) if isinstance(attr, list) else attr for attr in id_attrs)
         return hash((self.__class__, frozen_attrs))

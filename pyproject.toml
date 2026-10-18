@@ -1,0 +1,268 @@
+[project]
+name = "yandex-music"
+dynamic = ["version"]
+description = "Неофициальная Python библиотека для работы с API сервиса Яндекс.Музыка."
+authors = [
+    {name = "Ilya (Marshal)", email = "ilya@marshal.dev"}
+]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
+requires-python = ">=3.8"
+readme = "README.md"
+keywords = ["python", "yandex", "music", "api", "wrapper", "library", "client", "питон", "пайтон", "яндекс", "музыка", "апи", "обёртка", "библиотека", "клиент"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Natural Language :: Russian",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Internet",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: Implementation",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+    "requests[socks]",
+    "typing-extensions>=4.4.0",
+]
+
+[project.optional-dependencies]
+async = [
+    "aiohttp",
+    "aiofiles",
+]
+crypto = [
+    "cryptography",
+]
+orjson = [
+    "orjson",
+]
+pydantic-core = [
+    "pydantic-core",
+]
+ujson = [
+    "ujson",
+]
+ynison = [
+    # websockets.asyncio и websockets.sync с нужным API появились в 13.0;
+    # 13.1 это последняя версия с поддержкой Python 3.8
+    "websockets>=13.0",
+    "betterproto>=1.2.5,<3",
+]
+
+[dependency-groups]
+test = [
+    "pytest",
+    "pytest-cov",
+    "coverage",
+    "orjson",
+    "pydantic-core",
+    "ujson",
+]
+lint = [
+    "ruff==0.16.10",
+    "pyrefly==1.3.2",
+    "types-requests",
+    "types-aiofiles",
+]
+codegen = [
+    "unasync",
+    "betterproto[compiler]>=1.2.5,<3",
+    {include-group = "lint"},
+]
+# Sphinx 9.1 требует Python 3.12+
+docs = [
+    "sphinx==9.1.0; python_version >= '3.12'",
+    "sphinxawesome-theme==6.0.2; python_version >= '3.12'",
+    "myst-parser==5.0.0; python_version >= '3.12'",
+    "sphinx-design==0.7.0; python_version >= '3.12'",
+    "sphinx-docsearch==0.3.0; python_version >= '3.12'",
+    "sphinx-sitemap==2.9.0; python_version >= '3.12'",
+    "sphinxext-opengraph==0.13.0; python_version >= '3.12'",
+]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "codegen"},
+    {include-group = "docs"},
+]
+
+[project.urls]
+homepage = "https://ym.marshal.dev/"
+repository = "https://github.com/MarshalX/yandex-music-api"
+documentation = "https://ym.marshal.dev/"
+changes = "https://github.com/MarshalX/yandex-music-api/blob/main/CHANGES.md"
+issues = "https://github.com/MarshalX/yandex-music-api/issues"
+sponsoring = "https://github.com/sponsors/MarshalX"
+telegram = "https://t.me/yandex_music_api"
+codecov = "https://codecov.io/gh/MarshalX/yandex-music-api"
+codacy = "https://app.codacy.com/gh/MarshalX/yandex-music-api"
+
+[build-system]
+# PEP 639 (SPDX-лицензия) поддерживается начиная с hatchling 1.27
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.hatch.version]
+path = "yandex_music/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["yandex_music"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "yandex_music",
+    "tests",
+    "CHANGES.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyrefly]
+required-version = ">=1.3.2"
+preset = "all"
+python-version = "3.8"
+python-platform = "all"
+strict-callable-subtyping = true
+infer-with-first-use = false
+permissive-ignores = false
+search-path = [".", "examples/radio_example"]
+project-includes = ["yandex_music", "tests", "examples", "docs/generate_client_docs.py", "docs/generate_openapi.py", "generate_sync_version.py", "generate_camel_case_aliases.py", "release_guard.py"]
+
+[[tool.pyrefly.sub-config]]
+matches = "docs/generate_openapi.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/base.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/utils/json_backend.py"
+errors = { explicit-any = false, missing-source = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/utils/json_compat.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/_client_async/*"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/_client/*"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/utils/request.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/utils/request_async.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/album/album.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/artist/artist.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/download_info.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/experiments.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/landing/track_id.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/playlist/playlist_id.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/playlist/playlist.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/queue/queue_item.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/search/search.py"
+errors = { explicit-any = false }
+
+[[tool.pyrefly.sub-config]]
+matches = "yandex_music/track/track.py"
+errors = { explicit-any = false }
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "FA", # we are using typing.Optional/Union instead of `from __future__ import annotations`
+    "CPY001", # no copyright header in each file
+    "COM812", "ISC001", # conflicts with format
+    "RUF001", "RUF002", "RUF003", # cyrillic
+    "D203", "D413", # we are not using too many blank lines
+    "D213", # we are using the first line for summary
+    "D406", "D407", # we are using google style docstring
+    "ANN401", # t.Any in **kwargs and JSON payloads
+    "S101", # allow asserting; we are using it for type checks
+    "PLC0415", # local imports break circular dependencies between models
+    "FBT001", "FBT002", # public API has positional boolean arguments
+    "PLR0913", "PLR0917", # public API methods mirror request parameters
+    "TRY003", "EM101", "EM102", # exception messages are written inline
+    "FIX002", "TD003", # TODOs are allowed and do not require links
+]
+
+[tool.ruff.lint.per-file-ignores]
+"yandex_music/*.py" = [
+    "D105", "D104", "D100", "D107", "D103", "D415", # missing docstring
+    "D400", # first line should end with a period. TODO(MarshalX): We are using strange docsting style for methods-shortcuts
+    "N815", # camelCase aliases
+]
+"yandex_music/__init__.py" = ["I001"] # Import sort
+"yandex_music/client*.py" = ["T201"] # print
+"yandex_music/_client/*.py" = ["T201"] # print (generated)
+"yandex_music/_client_async/*.py" = ["T201"] # print
+"yandex_music/ynison/models/ynison_*.py" = ["RUF009", "E501"]
+"tests/*.py" = ["S105", "S106", "ANN", "D", "RUF012", "SLF001", "PLR2004", "PLR0915", "FBT003"]
+"tests/__init__.py" = ["F401"] # Unused import
+"test.py" = ["S101", "ERA001", "T201", "E501", "F401", "F841"]
+"docs/source/conf.py" = ["INP001"]
+"docs/generate_client_docs.py" = ["INP001", "T201"]
+"docs/generate_openapi.py" = ["INP001", "T201"]
+"examples/*.py" = ["T201", "S311", "ERA001", "INP001", "S106", "BLE001", "S603", "ANN", "D"]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+multiline-quotes = "double"
+inline-quotes = "single"
+
+[tool.ruff.format]
+quote-style = "single"

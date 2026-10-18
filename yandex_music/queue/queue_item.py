@@ -4,7 +4,7 @@ from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import ClientType, Context, JSONType, Queue
+    from yandex_music import ClientType, Context, Queue
 
 
 @model
@@ -27,41 +27,24 @@ class QueueItem(YandexMusicModel):
         self._id_attrs = (self.id,)
 
     def fetch_queue(self, *args: Any, **kwargs: Any) -> Optional['Queue']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.queue(id, *args, **kwargs)
+        Сокращение для::
+
+            client.queue(id, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.queue(self.id, *args, **kwargs)
 
     async def fetch_queue_async(self, *args: Any, **kwargs: Any) -> Optional['Queue']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.queue(id, *args, **kwargs)
+        Сокращение для::
+
+            await client.queue(id, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.queue(self.id, *args, **kwargs)
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['QueueItem']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.QueueItem`: Очередь в списке.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        from yandex_music import Context
-
-        cls_data = cls.cleanup_data(data, client)
-        cls_data['context'] = Context.de_json(data.get('context'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore
 
     # camelCase псевдонимы
 

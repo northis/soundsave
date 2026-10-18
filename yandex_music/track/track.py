@@ -4,15 +4,18 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union
 from yandex_music import YandexMusicModel
 from yandex_music.exceptions import InvalidBitrateError
 from yandex_music.utils import model
+from yandex_music.utils.request_base import default_timeout
 
 if TYPE_CHECKING:
     from yandex_music import (
         R128,
         Album,
         Artist,
+        Chart,
         ClientType,
+        CoverDerivedColors,
         DownloadInfo,
-        JSONType,
+        FileInfo,
         LyricsInfo,
         Major,
         MetaData,
@@ -22,6 +25,9 @@ if TYPE_CHECKING:
         TrackLyrics,
         User,
     )
+    from yandex_music.track.fade import Fade
+    from yandex_music.track.smart_preview_params import SmartPreviewParams
+    from yandex_music.utils.request_base import TimeoutType
 
 
 @model
@@ -92,6 +98,20 @@ class Track(YandexMusicModel):
             в соответствии с рекомендацией EBU R 128.
         lyrics_info (:obj:`yandex_music.LyricsInfo`, optional): Данные о наличии текстов трека.
         track_sharing_flag (:obj:`str`, optional): TODO.
+        derived_colors (:obj:`yandex_music.CoverDerivedColors`, optional): Производные цвета обложки трека.
+        fade (:obj:`yandex_music.Fade`, optional): Параметры затухания трека.
+        smart_preview_params (:obj:`yandex_music.SmartPreviewParams`, optional): Параметры умного превью трека.
+        special_audio_resources (:obj:`list` из :obj:`str`, optional): Специальные аудиоресурсы.
+        disclaimers (:obj:`list` из :obj:`str`, optional): Список дисклеймеров.
+        background_video_id (:obj:`str`, optional): Уникальный идентификатор видеошота.
+        player_id (:obj:`str`, optional): Идентификатор плеера видеошота.
+        mix_fade (:obj:`yandex_music.Fade`, optional): Параметры затухания трека при сведении в радио.
+        chart (:obj:`yandex_music.Chart`, optional): Позиция в чарте.
+        clip_ids (:obj:`list` из :obj:`int`): Уникальные идентификаторы клипов.
+        isrc (:obj:`str`, optional): Международный стандартный код записи (ISRC).
+        ugc_artist_name (:obj:`str`, optional): Имя исполнителя пользовательского трека.
+        podcast_episode_type (:obj:`str`, optional): Тип выпуска подкаста (например, `full`).
+        pub_date (:obj:`str`, optional): Дата публикации выпуска подкаста.
         client (:obj:`yandex_music.Client`): Клиент Yandex Music.
     """
 
@@ -138,58 +158,108 @@ class Track(YandexMusicModel):
     r128: Optional['R128'] = None
     lyrics_info: Optional['LyricsInfo'] = None
     track_sharing_flag: Optional[str] = None
+    derived_colors: Optional['CoverDerivedColors'] = None
+    fade: Optional['Fade'] = None
+    smart_preview_params: Optional['SmartPreviewParams'] = None
+    special_audio_resources: Optional[List[str]] = None
+    disclaimers: Optional[List[str]] = None
+    background_video_id: Optional[str] = None
+    player_id: Optional[str] = None
+    mix_fade: Optional['Fade'] = None
+    chart: Optional['Chart'] = None
+    clip_ids: List[int] = field(default_factory=list)
+    isrc: Optional[str] = None
+    ugc_artist_name: Optional[str] = None
+    podcast_episode_type: Optional[str] = None
+    pub_date: Optional[str] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
-        self.download_info = None
+        self.download_info: Optional[List[DownloadInfo]] = None
         self._id_attrs = (self.id,)
 
-    def get_download_info(self, get_direct_links: bool = False) -> List['DownloadInfo']:
-        """Сокращение для::
+    def get_download_info(self, get_direct_links: bool = False, **kwargs: Any) -> List['DownloadInfo']:
+        """Сокращение.
 
-        client.tracks_download_info(self.track_id, get_direct_links)
+        Сокращение для::
+
+            client.tracks_download_info(self.track_id, get_direct_links)
         """
         assert self.valid_client(self.client)
-        self.download_info = self.client.tracks_download_info(self.track_id, get_direct_links)
+        self.download_info = self.client.tracks_download_info(self.track_id, get_direct_links, **kwargs)
         return self.download_info
 
-    async def get_download_info_async(self, get_direct_links: bool = False) -> List['DownloadInfo']:
-        """Сокращение для::
+    async def get_download_info_async(self, get_direct_links: bool = False, **kwargs: Any) -> List['DownloadInfo']:
+        """Сокращение.
 
-        await client.tracks_download_info(self.track_id, get_direct_links)
+        Сокращение для::
+
+            await client.tracks_download_info(self.track_id, get_direct_links)
         """
         assert self.valid_async_client(self.client)
-        self.download_info = await self.client.tracks_download_info(self.track_id, get_direct_links)
+        self.download_info = await self.client.tracks_download_info(self.track_id, get_direct_links, **kwargs)
         return self.download_info
 
-    def get_supplement(self, *args: Any, **kwargs: Any) -> Optional['Supplement']:
-        """Сокращение для::
+    def get_file_info(
+        self, quality: str = 'lossless', codecs: Optional[List[str]] = None, transport: str = 'raw', **kwargs: Any
+    ) -> Optional['FileInfo']:
+        """Сокращение.
 
-        client.track_supplement(track.id, *args, **kwargs)
+        Сокращение для::
+
+            client.tracks_file_info(self.track_id, quality, codecs, transport, **kwargs)
+        """
+        assert self.valid_client(self.client)
+        return self.client.tracks_file_info(self.track_id, quality, codecs, transport, **kwargs)
+
+    async def get_file_info_async(
+        self, quality: str = 'lossless', codecs: Optional[List[str]] = None, transport: str = 'raw', **kwargs: Any
+    ) -> Optional['FileInfo']:
+        """Сокращение.
+
+        Сокращение для::
+
+            await client.tracks_file_info(self.track_id, quality, codecs, transport, **kwargs)
+        """
+        assert self.valid_async_client(self.client)
+        return await self.client.tracks_file_info(self.track_id, quality, codecs, transport, **kwargs)
+
+    def get_supplement(self, *args: Any, **kwargs: Any) -> Optional['Supplement']:
+        """Сокращение.
+
+        Сокращение для::
+
+            client.track_supplement(track.id, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.track_supplement(self.id, *args, **kwargs)
 
     async def get_supplement_async(self, *args: Any, **kwargs: Any) -> Optional['Supplement']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.track_supplement(track.id, *args, **kwargs)
+        Сокращение для::
+
+            await client.track_supplement(track.id, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.track_supplement(self.id, *args, **kwargs)
 
     def get_lyrics(self, *args: Any, **kwargs: Any) -> Optional['TrackLyrics']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.tracks_lyrics(track.id, *args, **kwargs)
+        Сокращение для::
+
+            client.tracks_lyrics(track.id, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.tracks_lyrics(self.id, *args, **kwargs)
 
     async def get_lyrics_async(self, *args: Any, **kwargs: Any) -> Optional['TrackLyrics']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.tracks_lyrics(track.id, *args, **kwargs)
+        Сокращение для::
+
+            client.tracks_lyrics(track.id, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.tracks_lyrics(self.id, *args, **kwargs)
@@ -314,43 +384,53 @@ class Track(YandexMusicModel):
         assert self.valid_async_client(self.client)
         return await self.client.request.retrieve(self.get_og_image_url(size))
 
-    def get_specific_download_info(self, codec: str, bitrate_in_kbps: int) -> Optional['DownloadInfo']:
+    def get_specific_download_info(
+        self, codec: str, bitrate_in_kbps: int, timeout: 'TimeoutType' = default_timeout
+    ) -> Optional['DownloadInfo']:
         """Возвращает вариант загрузки по критериям.
 
         Args:
             codec (:obj:`str`, optional): Кодек из доступных в `self.download_info`.
             bitrate_in_kbps (:obj:`int`, optional): Битрейт из доступных в `self.download_info` для данного кодека.
+            timeout (:obj:`int` | :obj:`float`, optional): Время ожидания ответа сервера в секундах, если информацию
+                о загрузке нужно запросить. По умолчанию используется значение клиента.
 
         Returns:
             :obj:`yandex_music.DownloadInfo` | :obj:`None`: Вариант загрузки трека или :obj:`None`.
         """
         if self.download_info is None:
-            self.download_info = self.get_download_info()
+            self.download_info = self.get_download_info(timeout=timeout)
 
         for info in self.download_info:
             if info.codec == codec and info.bitrate_in_kbps == bitrate_in_kbps:
                 return info
         return None
 
-    async def get_specific_download_info_async(self, codec: str, bitrate_in_kbps: int) -> Optional['DownloadInfo']:
+    async def get_specific_download_info_async(
+        self, codec: str, bitrate_in_kbps: int, timeout: 'TimeoutType' = default_timeout
+    ) -> Optional['DownloadInfo']:
         """Возвращает вариант загрузки по критериям.
 
         Args:
             codec (:obj:`str`, optional): Кодек из доступных в `self.download_info`.
             bitrate_in_kbps (:obj:`int`, optional): Битрейт из доступных в `self.download_info` для данного кодека.
+            timeout (:obj:`int` | :obj:`float`, optional): Время ожидания ответа сервера в секундах, если информацию
+                о загрузке нужно запросить. По умолчанию используется значение клиента.
 
         Returns:
             :obj:`yandex_music.DownloadInfo` | :obj:`None`: Вариант загрузки трека или :obj:`None`.
         """
         if self.download_info is None:
-            self.download_info = await self.get_download_info_async()
+            self.download_info = await self.get_download_info_async(timeout=timeout)
 
         for info in self.download_info:
             if info.codec == codec and info.bitrate_in_kbps == bitrate_in_kbps:
                 return info
         return None
 
-    def download(self, filename: str, codec: str = 'mp3', bitrate_in_kbps: int = 192) -> None:
+    def download(
+        self, filename: str, codec: str = 'mp3', bitrate_in_kbps: int = 192, timeout: 'TimeoutType' = default_timeout
+    ) -> None:
         """Загрузка трека.
 
         Note:
@@ -362,17 +442,22 @@ class Track(YandexMusicModel):
             filename (:obj:`str`): Путь для сохранения файла с названием и расширением.
             codec (:obj:`str`, optional): Кодек из доступных в `self.download_info`.
             bitrate_in_kbps (:obj:`int`, optional): Битрейт из доступных в `self.download_info` для данного кодека.
+            timeout (:obj:`int` | :obj:`float`, optional): Время ожидания ответа сервера в секундах для каждого
+                запроса загрузки (информация о загрузке, XML с прямой ссылкой, сам файл). Ограничивает ожидание
+                соединения и каждой порции данных, а не всю загрузку. По умолчанию используется значение клиента.
 
         Raises:
             :class:`yandex_music.exceptions.InvalidBitrateError`: Если в `self.download_info` не найден подходящий трек.
         """
-        info = self.get_specific_download_info(codec, bitrate_in_kbps)
-        if info:
-            info.download(filename)
+        info = self.get_specific_download_info(codec, bitrate_in_kbps, timeout)
+        if info is not None:
+            info.download(filename, timeout)
         else:
             raise InvalidBitrateError('Unavailable bitrate')
 
-    async def download_async(self, filename: str, codec: str = 'mp3', bitrate_in_kbps: int = 192) -> None:
+    async def download_async(
+        self, filename: str, codec: str = 'mp3', bitrate_in_kbps: int = 192, timeout: 'TimeoutType' = default_timeout
+    ) -> None:
         """Загрузка трека.
 
         Note:
@@ -384,17 +469,22 @@ class Track(YandexMusicModel):
             filename (:obj:`str`): Путь для сохранения файла с названием и расширением.
             codec (:obj:`str`, optional): Кодек из доступных в `self.download_info`.
             bitrate_in_kbps (:obj:`int`, optional): Битрейт из доступных в `self.download_info` для данного кодека.
+            timeout (:obj:`int` | :obj:`float`, optional): Время ожидания в секундах для каждого запроса загрузки
+                (информация о загрузке, XML с прямой ссылкой, сам файл). Ограничивает всё время запроса целиком,
+                включая загрузку файла. По умолчанию используется значение клиента.
 
         Raises:
             :class:`yandex_music.exceptions.InvalidBitrateError`: Если в `self.download_info` не найден подходящий трек.
         """
-        info = await self.get_specific_download_info_async(codec, bitrate_in_kbps)
-        if info:
-            await info.download_async(filename)
+        info = await self.get_specific_download_info_async(codec, bitrate_in_kbps, timeout)
+        if info is not None:
+            await info.download_async(filename, timeout)
         else:
             raise InvalidBitrateError('Unavailable bitrate')
 
-    def download_bytes(self, codec: str = 'mp3', bitrate_in_kbps: int = 192) -> bytes:
+    def download_bytes(
+        self, codec: str = 'mp3', bitrate_in_kbps: int = 192, timeout: 'TimeoutType' = default_timeout
+    ) -> bytes:
         """Загрузка трека и возврат в виде байтов.
 
         Note:
@@ -405,6 +495,9 @@ class Track(YandexMusicModel):
         Args:
             codec (:obj:`str`, optional): Кодек из доступных в `self.download_info`.
             bitrate_in_kbps (:obj:`int`, optional): Битрейт из доступных в `self.download_info` для данного кодека.
+            timeout (:obj:`int` | :obj:`float`, optional): Время ожидания ответа сервера в секундах для каждого
+                запроса загрузки (информация о загрузке, XML с прямой ссылкой, сам файл). Ограничивает ожидание
+                соединения и каждой порции данных, а не всю загрузку. По умолчанию используется значение клиента.
 
         Raises:
             :class:`yandex_music.exceptions.InvalidBitrateError`: Если в `self.download_info` не найден подходящий трек.
@@ -412,13 +505,15 @@ class Track(YandexMusicModel):
         Returns:
             :obj:`bytes`: Трек в виде байтов.
         """
-        info = self.get_specific_download_info(codec, bitrate_in_kbps)
-        if info:
-            return info.download_bytes()
+        info = self.get_specific_download_info(codec, bitrate_in_kbps, timeout)
+        if info is not None:
+            return info.download_bytes(timeout)
 
         raise InvalidBitrateError('Unavailable bitrate')
 
-    async def download_bytes_async(self, codec: str = 'mp3', bitrate_in_kbps: int = 192) -> bytes:
+    async def download_bytes_async(
+        self, codec: str = 'mp3', bitrate_in_kbps: int = 192, timeout: 'TimeoutType' = default_timeout
+    ) -> bytes:
         """Загрузка трека и возврат в виде байтов.
 
         Note:
@@ -429,6 +524,9 @@ class Track(YandexMusicModel):
         Args:
             codec (:obj:`str`, optional): Кодек из доступных в `self.download_info`.
             bitrate_in_kbps (:obj:`int`, optional): Битрейт из доступных в `self.download_info` для данного кодека.
+            timeout (:obj:`int` | :obj:`float`, optional): Время ожидания в секундах для каждого запроса загрузки
+                (информация о загрузке, XML с прямой ссылкой, сам файл). Ограничивает всё время запроса целиком,
+                включая загрузку файла. По умолчанию используется значение клиента.
 
         Raises:
             :class:`yandex_music.exceptions.InvalidBitrateError`: Если в `self.download_info` не найден подходящий трек.
@@ -436,40 +534,48 @@ class Track(YandexMusicModel):
         Returns:
             :obj:`bytes`: Трек в виде байтов.
         """
-        info = await self.get_specific_download_info_async(codec, bitrate_in_kbps)
-        if info:
-            return await info.download_bytes_async()
+        info = await self.get_specific_download_info_async(codec, bitrate_in_kbps, timeout)
+        if info is not None:
+            return await info.download_bytes_async(timeout)
 
         raise InvalidBitrateError('Unavailable bitrate')
 
     def like(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_tracks_add(track.id, user.id, *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_tracks_add(track.id, user.id, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.users_likes_tracks_add(self.track_id, self.client.account_uid, *args, **kwargs)
 
     async def like_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_tracks_add(track.id, user.id, *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_tracks_add(track.id, user.id, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_tracks_add(self.track_id, self.client.account_uid, *args, **kwargs)
 
     def dislike(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_tracks_remove(track.id, user.id *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_tracks_remove(track.id, user.id *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.users_likes_tracks_remove(self.track_id, self.client.account_uid, *args, **kwargs)
 
     async def dislike_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_tracks_remove(track.id, user.id *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_tracks_remove(track.id, user.id *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_tracks_remove(self.track_id, self.client.account_uid, *args, **kwargs)
@@ -480,45 +586,14 @@ class Track(YandexMusicModel):
         Returns:
               :obj:`list` из :obj:`str`: Имена исполнителей.
         """
-        return [i.name for i in self.artists if i.name]
+        return [i.name for i in self.artists if i.name is not None and i.name != '']
 
     @property
     def track_id(self) -> str:
         """:obj:`str`: Уникальный идентификатор трека состоящий из его номера и номера альбома или просто из номера."""
-        if self.albums:
+        if len(self.albums) > 0:
             return f'{self.id}:{self.albums[0].id}'
         return f'{self.id}'
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Track']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.Track`: Трек.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import R128, Album, Artist, LyricsInfo, Major, MetaData, Normalization, PoetryLoverMatch, User
-
-        cls_data['albums'] = Album.de_list(data.get('albums'), client)
-        cls_data['artists'] = Artist.de_list(data.get('artists'), client)
-        cls_data['normalization'] = Normalization.de_json(data.get('normalization'), client)
-        cls_data['major'] = Major.de_json(data.get('major'), client)
-        cls_data['substituted'] = Track.de_json(data.get('substituted'), client)
-        cls_data['matched_track'] = Track.de_json(data.get('matched_track'), client)
-        cls_data['user_info'] = User.de_json(data.get('user_info'), client)
-        cls_data['meta_data'] = MetaData.de_json(data.get('meta_data'), client)
-        cls_data['poetry_lover_matches'] = PoetryLoverMatch.de_list(data.get('poetry_lover_matches'), client)
-        cls_data['r128'] = R128.de_json(data.get('r128'), client)
-        cls_data['lyrics_info'] = LyricsInfo.de_json(data.get('lyrics_info'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore
 
     # camelCase псевдонимы
 
@@ -526,6 +601,10 @@ class Track(YandexMusicModel):
     getDownloadInfo = get_download_info
     #: Псевдоним для :attr:`get_download_info_async`
     getDownloadInfoAsync = get_download_info_async
+    #: Псевдоним для :attr:`get_file_info`
+    getFileInfo = get_file_info
+    #: Псевдоним для :attr:`get_file_info_async`
+    getFileInfoAsync = get_file_info_async
     #: Псевдоним для :attr:`get_supplement`
     getSupplement = get_supplement
     #: Псевдоним для :attr:`get_supplement_async`
