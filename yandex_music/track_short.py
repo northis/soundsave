@@ -4,7 +4,7 @@ from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import Chart, ClientType, JSONType, Track
+    from yandex_music import Chart, ClientType, Track
 
 
 @model
@@ -23,6 +23,7 @@ class TrackShort(YandexMusicModel):
         chart (:obj:`yandex_music.Chart`, optional): Позиция в чарте.
         track (:obj:`yandex_music.Track`, optional): Полная версия трека.
         original_index (:obj:`int`, optional): Индекс в плейлисте или альбоме. TODO уточнить про альбом.
+        original_shuffle_index (:obj:`int`, optional): Индекс в перемешанном плейлисте.
         client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
     """
 
@@ -34,6 +35,7 @@ class TrackShort(YandexMusicModel):
     chart: Optional['Chart'] = None
     track: Optional['Track'] = None
     original_index: Optional[int] = None
+    original_shuffle_index: Optional[int] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
@@ -60,32 +62,10 @@ class TrackShort(YandexMusicModel):
     @property
     def track_id(self) -> str:
         """:obj:`str`: Уникальный идентификатор трека состоящий из его номера и номера альбома или просто из номера."""
-        if self.album_id:
+        if self.album_id is not None and self.album_id != '':
             return f'{self.id}:{self.album_id}'
 
         return f'{self.id}'
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['TrackShort']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.TrackShort`: Укороченная версия трека с неполными данными.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Chart, Track
-
-        cls_data['track'] = Track.de_json(data.get('track'), client)
-        cls_data['chart'] = Chart.de_json(data.get('chart'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore
 
     # camelCase псевдонимы
 

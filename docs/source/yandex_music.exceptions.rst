@@ -1,7 +1,5 @@
-yandex\_music.exceptions
-========================
+Исключения
+==========
 
 .. automodule:: yandex_music.exceptions
    :members:
-   :undoc-members:
-   :show-inheritance:

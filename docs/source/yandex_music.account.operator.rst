@@ -1,7 +1,5 @@
-yandex\_music.account.operator
-==============================
+Operator
+========
 
 .. automodule:: yandex_music.account.operator
    :members:
-   :undoc-members:
-   :show-inheritance:

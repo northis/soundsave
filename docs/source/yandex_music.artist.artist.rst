@@ -1,7 +1,5 @@
-yandex\_music.artist.artist
-===========================
+Artist
+======
 
 .. automodule:: yandex_music.artist.artist
    :members:
-   :undoc-members:
-   :show-inheritance:

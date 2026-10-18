@@ -1,24 +1,201 @@
 # Список изменений
 
+## Версия 3.2.2
+
+**11.10.2026**
+
+**Исправлены расхождения моделей с API, структура неизвестных полей в отчётах**
+
+**Незначительные изменения и/или исправления**
+
+- В отчёты о расхождениях моделей с API добавлена структура значений неизвестных полей без самих значений, например `list[{id: int, title: str}]`. Доступна в `SchemaMismatch.unknown_field_shapes` ([#749](https://github.com/MarshalX/yandex-music-api/pull/749)).
+- Поля `Search.best`, `Search.albums`, `Search.artists`, `Search.playlists`, `Search.tracks`, `Search.videos`, `Search.users`, `Search.podcasts`, `Search.podcast_episodes`, `Playlist.owner`, `MadeFor.case_forms`, `CustomWave.position` и `Station.geocell_icon` стали необязательными ([#750](https://github.com/MarshalX/yandex-music-api/pull/750)).
+- Добавлены новые поля от API ([#750](https://github.com/MarshalX/yandex-music-api/pull/750)):
+    - `Album`: `background_image_url`, `custom_wave`, `duration_sec`, `has_trailer`, `trailer`, `pager`, `sort_order`.
+    - `AlbumActionButton`: `view_browser`.
+    - `Artist`: `derived_colors`, `action_button`, `donation_info`, `has_trailer`, `trailer`.
+    - `BriefInfo`: `action_button`, `background_image_url`, `background_video_id`, `background_video_url`, `bandlink_scanner_link`, `clips`, `custom_wave`, `has_trailer`, `links`, `upcoming_album`.
+    - `CustomWave`: `square_agent_animation`.
+    - `Playlist`: `action_button`, `artist_playlist_type`, `child_content`, `derived_colors`, `made_for_user`.
+    - `Search`: `clips` (новый тип результата `clip`), `banner`.
+    - `Track`: `chart`, `clip_ids`, `isrc`, `ugc_artist_name`, `podcast_episode_type`, `pub_date`.
+    - `TrackShort`: `original_shuffle_index`.
+- Новые модели `AlbumTrailerStatus`, `ArtistDonationInfo`, `MadeForUser`, `SearchBanner` и `UpcomingAlbum` ([#750](https://github.com/MarshalX/yandex-music-api/pull/750)).
+
+## Версия 3.2.1
+
+**07.10.2026**
+
+**Исправлены расхождения моделей с API**
+
+**Незначительные изменения и/или исправления**
+
+- Поля `Playlist.made_for`, `Playlist.play_counter`, `Playlist.playlist_absence`, `Subscription.non_auto_renewable_remainder` и `TagResult.tag` стали необязательными ([#746](https://github.com/MarshalX/yandex-music-api/pull/746)).
+
+## Версия 3.2.0
+
+**06.10.2026**
+
+**Справочник API в формате OpenAPI, lossless, выбор JSON библиотеки и отчёты о расхождениях с API**
+
+**Крупные изменения**
+
+- **Справочник API Яндекс Музыки в формате OpenAPI**: [ym.marshal.dev/api](https://ym.marshal.dev/api/) ([#739](https://github.com/MarshalX/yandex-music-api/pull/739)):
+    - Открытое описание неофициального API Яндекс Музыки: 150 методов на 144 эндпоинтах и более 220 схем моделей ответов.
+    - Интерактивная страница с поиском, описанием параметров, тел запросов и ответов, а также примерами вызова через библиотеку и curl.
+    - Каждый метод ссылается на соответствующий метод `Client` в документации библиотеки. Описаны заголовки, которые библиотека отправляет в каждом запросе.
+    - Спецификация доступна файлом [openapi.json](https://ym.marshal.dev/api/openapi.json): её можно импортировать в Postman, Insomnia или Bruno и генерировать по ней клиенты на других языках.
+    - Спецификация собирается автоматически из кода библиотеки скриптом `docs/generate_openapi.py` и обновляется вместе с ней.
+- **Треки в lossless качестве** ([#731](https://github.com/MarshalX/yandex-music-api/pull/731)):
+    - Новый метод клиента `tracks_file_info` (качество `lossless`, `hq`, `nq`, выбор кодеков и способа доставки `raw` или `encraw`) и сокращения `Track.get_file_info`, `get_file_info_async`.
+    - Новые модели `FileInfo` и `FileDownloadInfo` с методами `download`, `download_bytes` и их асинхронными версиями.
+    - Файлы в `encraw` расшифровываются при загрузке через `yandex_music.utils.decrypt`. Зависимость устанавливается через `pip install yandex-music[crypto]`.
+- **Выбор JSON библиотеки** ([#738](https://github.com/MarshalX/yandex-music-api/pull/738)):
+    - Вся сериализация и десериализация (ответы API, тела запросов, `to_json` моделей, фреймы Ynison) идёт через протокол `JsonBackend` из модуля `yandex_music.utils.json_backend`.
+    - Из коробки поддерживаются `orjson`, `pydantic-core`, `ujson` и стандартный `json`. По умолчанию выбирается самая быстрая из установленных. Экстры `orjson`, `pydantic-core` и `ujson`.
+    - Библиотеку можно задать для клиента параметром `json_backend` или глобально через `set_default_json_backend`, а также подключить свою, реализовав `loads` и `dumps`.
+- **Отчёты о расхождениях моделей с API** ([#740](https://github.com/MarshalX/yandex-music-api/pull/740)):
+    - Отсутствующее или равное `null` обязательное поле больше не вызывает ошибку: поле получает `None`, а в лог один раз на модель и набор полей пишется предупреждение со ссылкой на заполненный issue.
+    - Новые параметры клиента `strict` (вызывать `SchemaMismatchError` вместо предупреждения) и `on_schema_mismatch` (свой обработчик отчёта `SchemaMismatch`). `report_unknown_fields=True` добавляет в отчёт неизвестные поля.
+    - Новый модуль `yandex_music.utils.schema_mismatch`, исключение `SchemaMismatchError`, новый шаблон issue.
+- Пакет помечен как типизированный (`py.typed`, PEP 561), аннотации типов во всей библиотеке проверяются в строгом режиме ([#734](https://github.com/MarshalX/yandex-music-api/pull/734)).
+- Вложенные модели десериализуются автоматически по аннотациям полей, ручные переопределения `de_json` удалены ([#736](https://github.com/MarshalX/yandex-music-api/pull/736)).
+
+**Незначительные изменения и/или исправления**
+
+- Поле `User.login` стало необязательным, сравнение пользователей идёт только по `uid` ([#733](https://github.com/MarshalX/yandex-music-api/pull/733)).
+- Улучшено отображение моделей в документации ([#737](https://github.com/MarshalX/yandex-music-api/pull/737)).
+
+**Ведение проекта**
+
+- Добавлена строгая проверка типов `pyrefly` в CI ([#734](https://github.com/MarshalX/yandex-music-api/pull/734)).
+- Обновлён Ruff, включены все правила линтера ([#735](https://github.com/MarshalX/yandex-music-api/pull/735)).
+
+## Версия 3.1.0
+
+**05.10.2026**
+
+**Поддержка Ynison, сессий радио и генеративных станций**
+
+**Крупные изменения**
+
+- **Поддержка Ynison**: новый модуль `yandex_music.ynison` синхронизирует состояние плеера между устройствами и управляет воспроизведением удалённо. Зависимости устанавливаются через `pip install yandex-music[ynison]` ([#716](https://github.com/MarshalX/yandex-music-api/pull/716), [#717](https://github.com/MarshalX/yandex-music-api/pull/717), [#726](https://github.com/MarshalX/yandex-music-api/pull/726)):
+    - Простые интерфейсы `simple` и `simple_async` для разовых действий: `get_state`, `get_current_track`, `get_devices`, `get_active_device`, `pause`, `resume`, `next_track`, `previous_track`, `set_volume`.
+    - Долгоживущие клиенты `YnisonClient` и `YnisonClientAsync` на постоянном соединении: методы `pause`, `resume`, `next_track`, `previous_track`, `set_volume(volume, target_device_id=None)`, свойства `state`, `latest_state`, `current_playable`, `active_device`, `device_id`, `is_running`, подписки `on_state`, `on_error` и `remove_listener`.
+    - Параметры клиентов `device_title` (название устройства для других клиентов) и `max_reconnect_attempts`. Идентификатор устройства по умолчанию вычисляется из токена, поэтому повторные запуски не создают новые устройства в сессии.
+    - Автоматическое переподключение при обрыве соединения с паузами по рекомендациям сервера и keepalive-пингами по его параметрам.
+    - Переключение треков учитывает перемешивание очереди, позиция трека при паузе и продолжении сохраняется.
+    - Модуль `yandex_music.ynison.utils` с хелперами `get_current_playable`, `get_active_device`, `get_playback_order`, `get_neighbour_index`, `get_current_progress_ms`. Короткое имя `YnisonState` для полного состояния.
+    - Исключения `YnisonTimeoutError`, `YnisonConnectionClosedError`, `YnisonNoActiveDeviceError`, `YnisonQueueBoundaryError`, `YnisonServerError` (с атрибутами `message`, `grpc_code`, `http_code`, `error_code`, `backoff_ms`, `go_away_seconds`) и его наследники `YnisonUnauthorizedError`, `YnisonDeviceDisplacedError`.
+- **Сессии радио, волны и генеративные станции** ([#722](https://github.com/MarshalX/yandex-music-api/pull/722)):
+    - Новый миксин `RotorSessionsMixin`: `rotor_session_new`, `rotor_session_clone`, `rotor_session_tracks`, `rotor_session_feedback` и хелперы `rotor_session_feedback_radio_started`, `rotor_session_feedback_track_started`, `rotor_session_feedback_track_finished`, `rotor_session_feedback_skip`, а также `rotor_session_feedbacks`, `rotor_sessions_feedbacks`, `rotor_combined_session_new`, `rotor_combined_session_next`, `rotor_combined_session_landing`.
+    - Новый миксин `WaveMixin`: `rotor_wave_last`, `rotor_wave_last_reset`, `rotor_wave_settings`.
+    - Генеративные станции в `RadioMixin`: `rotor_station_stream`, `rotor_station_stream_feedback`.
+    - Новые модели: `RotorSeed`, `RotorSession`, `RotorSessionTracks`, `TrackParameters`, `SessionEvent`, `SessionPlayable`, `SessionFeedback`, `SessionFeedbacks`, `CombinedSession`, `CombinedSessionItem`, `CombinedSessionLanding`, `CombinedSessionQueueItem`, `GenerativeStream`, `GenerativeStreamData`, `GenerativeStreamInfo`, `GenerativeStreamFeedback`, `WaveSettings`, `WaveSettingsBlock`, `WaveDefaultStation`.
+    - Новые поля в существующих моделях: `Track.mix_fade`; `Album.cover`, `derived_colors`, `meta_tag_id`, `child_content`; `Sequence.track_parameters`; `Station.special_context`, `listeners`, `login`, `full_name`, `display_name`, `visibility`; `Value.image_url`, `serialized_seed`, `unspecified`; `Wave.station_id`, `id_for_from`, `type`; `R128.important_secs`; `StationTracksResult.radio_session_id`; `InvocationInfo.app_name`; `Status.has_options`; `Account.region_code`, `non_owner_family_member`; `Plus.migrated`.
+- Параметр `timeout` у методов загрузки треков: `Track.download`, `download_bytes`, `get_specific_download_info` и `DownloadInfo.get_direct_link`, `download`, `download_bytes` с асинхронными версиями ([#723](https://github.com/MarshalX/yandex-music-api/pull/723)).
+- Новые примеры: консольное радио «Моя волна» `examples/wave_radio.py` ([#723](https://github.com/MarshalX/yandex-music-api/pull/723)) и удалённый пульт плеера через Ynison `examples/ynison_remote.py` ([#718](https://github.com/MarshalX/yandex-music-api/pull/718)).
+
+**Незначительные изменения и/или исправления**
+
+- Исправлена отправка обратной связи радио: `rotor_station_feedback` отправляет данные в JSON ([#720](https://github.com/MarshalX/yandex-music-api/pull/720)).
+- Исправлена отправка настроек радиостанции: `rotor_station_settings2` отправляет данные в JSON ([#721](https://github.com/MarshalX/yandex-music-api/pull/721)).
+- `rotor_station_feedback` принимает `stream_id`, время по умолчанию передаётся в формате ISO 8601 ([#722](https://github.com/MarshalX/yandex-music-api/pull/722)).
+- Исправлено падение `rotor_account_status`: поле `Subscription.had_any_subscription` стало необязательным ([#722](https://github.com/MarshalX/yandex-music-api/pull/722)).
+- В документацию добавлены страницы «Ynison» и «Радио», исправлена подсветка кода в светлой теме ([#725](https://github.com/MarshalX/yandex-music-api/pull/725)).
+
+**Ведение проекта**
+
+- Сборка пакета переведена с `setup.py` на `pyproject.toml`, зависимости разработки разбиты на группы, проект управляется через uv с lock-файлом `uv.lock`.
+- Публикация в PyPI переведена на Trusted Publishing (OIDC) с аттестациями.
+
+## Версия 3.0.0
+
+**18.04.2026**
+
+**Массовое расширение покрытия API, OAuth Device Flow, переход на миксины**
+
+**Переломные изменения**
+
+- Прекращена поддержка `Python 3.7`.
+- Асинхронные зависимости (`aiohttp`, `aiofiles`) вынесены в опциональный экстра — теперь устанавливаются через `pip install yandex-music[async]`. Синхронный клиент работает без них.
+- Модель `Label` перемещена из подпакета `yandex_music.album` в новый подпакет `yandex_music.label` и расширена полями `description`, `description_formatted`, `image`, `links`, `type`. Публичный импорт `from yandex_music import Label` продолжает работать; сломаются только прямые импорты из подмодуля `yandex_music.album.label`.
+
+**Крупные изменения**
+
+- Добавлена поддержка `Python 3.13` и `Python 3.14`.
+- **Поддержка OAuth Device Flow** для получения токена:
+    - Новый миксин `DeviceAuthMixin` с методами `request_device_code`, `poll_device_token` и блокирующим хелпером `device_auth` (callback для показа кода, `poll_interval`, `timeout`, `should_cancel`).
+    - Новые модели `DeviceCode` и `OAuthToken`, исключение `DeviceAuthError`.
+    - Новый пример `examples/device_auth.py` (sync + async), переписанная страница документации по получению токена.
+- **Массовое расширение покрытия API**. Добавлено более 70 новых методов клиента и около 90 новых моделей в следующих доменных группах:
+    - **Альбомы**: `albums_with_tracks` (перенесён), `albums_disclaimer`, `albums_similar_entities`, `albums_trailer`.
+    - **Артисты**: `artists_similar`, `artists_links`, `artists_also_albums`, `artists_discography_albums`, `artists_safe_direct_albums`, `artists_track_ids`, `artists_about`, `artists_clips`, `artists_donation`, `artists_info`, `artists_skeleton`, `artists_trailer`, `artists_disclaimer`. Новые наиболее значимые модели: `ArtistAbout`, `ArtistInfo`, `ArtistSimilar`, `ArtistLinks`, `ArtistDonations`, `ArtistClips`, `ArtistTrailer`, `ArtistSkeleton`, `ArtistConcerts`.
+    - **Треки**: `tracks_credits`, `tracks_disclaimer`, `tracks_trailer`, `tracks_full_info`. Новые модели: `Credit`, `Credits`, `Disclaimer`, `ForeignAgent`, `TrackTrailer`, `TrackFullInfo`, `Fade`, `SmartPreviewParams`.
+    - **Плейлисты**: `playlist`, `playlist_similar_entities`, `playlists`, `playlists_personal`, `users_playlists_description`, `users_playlists_trailer`, `users_playlists_kinds`. Новые модели: `PlaylistTrailer`, `PlaylistSimilarEntities`, `PlaylistAvailability`, `PlaylistsList`.
+    - **Клипы** (новая сущность): `clips`, `clips_will_like`, `clips_credits`, `clips_disclaimer`. Новые модели: `Clip`, `ClipsWillLike`.
+    - **Концерты**: `concert_info`, `concert_skeleton`, `concerts_feed`, `concerts_locations`, `concerts_tab_config`, `artists_concerts`. Новые модели: `Concert`, `ConcertInfo`, `ConcertFeed`, `ConcertLocations`, `ConcertTabConfig`, `ConcertSkeleton` и ещё около десятка связанных.
+    - **Лейблы** (новая группа): `label`, `label_albums`, `label_artists`. Новые модели: `LabelAlbums`, `LabelArtists`, `AlbumActionButton`.
+    - **Метатеги** (новая группа, подборки лендинга): `metatags`, `metatag`, `metatag_albums`, `metatag_artists`, `metatag_playlists`. Около 10 новых моделей в подпакете `yandex_music.metatag`.
+    - **История прослушивания** (новая группа): `music_history`, `music_history_items`. Новые модели: `MusicHistory`, `MusicHistoryTab`, `MusicHistoryGroup`, `MusicHistoryItem` и другие.
+    - **Предсохранения альбомов** (новая группа): `users_presaves`, `users_presaves_add`, `users_presaves_remove`. Новая модель `Presaves`.
+    - **Закреплённые элементы** (новая группа): `pins`, `pin_album`, `unpin_album`, `pin_artist`, `unpin_artist`, `pin_playlist`, `unpin_playlist`, `pin_wave`, `unpin_wave`. Новые модели: `Pin`, `PinData`, `PinsList`.
+    - **Лайки и дизлайки**: `users_dislikes_artists`, `users_dislikes_artists_add`, `users_dislikes_artists_remove`, `users_likes_clips`, `users_likes_clips_add`, `users_likes_clips_remove`. Все 20 маршрутов лайков/дизлайков теперь покрыты.
+    - **Аккаунт**: `account_experiments_details`. Новые модели: `ExperimentsDetails`, `ExperimentDetail`, `ExperimentDetailValue`.
+    - **Прочее**: `ContentRestrictions`, `CoverDerivedColors`, `Wave`, `WaveAgent`, а также скелетоны страниц (общие модели в `yandex_music.skeleton`).
+    - В существующие модели (`Track`, `Album`, `Artist`, `Playlist`, `Cover`, `Clip`, `Concert` и др.) добавлены десятки новых полей.
+- **Поддержка `orjson`** как опциональной замены `ujson` и стандартного `json` для ускорения сериализации/десериализации.
+- `Request` и `RequestAsync` теперь поддерживают HTTP-методы `PUT` и `DELETE`.
+- Добавлена статистика прослушиваний исполнителя за месяц.
+
+**Ведение проекта**
+
+- Монолитный `client_async.py` разбит на миксины в `_client_async/`, сгруппированные по доменам API (account, landing, tracks, search, playlists, radio, artists, albums, likes, queue, clips, concerts, credits, disclaimers, labels, metatags, music_history, pins, presaves, device_auth). Публичный API клиента остался прежним.
+- Кодогенерация синхронного клиента переведена на `unasync` (вместо собственного генератора). Асинхронная версия теперь первична, синхронная версия автоматически генерируется из `_client_async/`.
+- Оптимизирована десериализация моделей: ленивая нормализация ключей `camelCase → snake_case`, устранение лишних аллокаций, `frozenset` для зарезервированных имён, удаление избыточных `.copy()` в `cleanup_data` и `to_dict`.
+- Общая логика `Request` вынесена в базовый класс.
+- `requests`, `aiohttp` и `aiofiles` импортируются лениво.
+- Переработана документация: смена темы на `sphinxawesome_theme`, интеграция `Algolia DocSearch`, добавлены `sitemap.xml`, `OpenGraph`, плоская навигация, витрина моделей с карточками `sphinx-design`, глоссарий, отдельные страницы для каждого миксина клиента, редиректы для совместимости старых URL.
+
+**Незначительные изменения и/или исправления**
+
+- Исправлены `get_page` и `get_page_async` у класса `Search`.
+- Исправлен тайпхинт в классе `LandingList`.
+- Исправлен метод `de_list` для класса `List`.
+- Исправлена отправка `POST` запроса в методах `rotor_station_*`.
+- Поле `id` класса `Artist` стало опциональным.
+- Поле `uri` класса `Description` стало опциональным.
+- Исправлено форматирование документации у класса `Like`.
+- Методам `.init()` у `Client` и `ClientAsync` добавлена передача `*args, **kwargs`.
+- Добавлена передача `kwargs` в запросы из методов-сокращений скачивания трека.
+- Уточнены аннотации типов в миксинах клиента (`TypeGuard`, `Overload`, корректный тип `account_uid`).
+- Улучшены аннотации типов во всех моделях.
+
 ## Версия 2.2.0
 
 **24.12.2023**
 
-* Добавлена поддержка Python 3.12 by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/628
-* Добавлен fallback до `None` или пустого списка при данных неправильного типа  by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/612
-* Обновлён HTTP заголовок версии приложения by @glebliutsko in https://github.com/MarshalX/yandex-music-api/pull/592 and @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/635
-* Исправлен метод `fetch_lyrics_async` by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/627
-* Исправлен тип поля `items_uri` в классе `Cover` by @Rirusha in https://github.com/MarshalX/yandex-music-api/pull/603
-* Исправлена аннотация типа `de_list` и тесты на пустой список by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/612
+**Крупные изменения**
 
-Ведение проекта:
-* Переезд на `ruff` и `ruff format` by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/625 and https://github.com/MarshalX/yandex-music-api/pull/632
-* Добавлен GitHub Actions Workflow для проверки актуальности генерируемого кода by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/624
-* Упрощены GitHub Actions Workflow by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/623
-* Удалено использование dev ветки by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/622
-* Улучшены аннотации типов by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/626
-* Исправление ошибок в `README` by @json1c in https://github.com/MarshalX/yandex-music-api/pull/599 and @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/629
-* Обновлена структура документации by @MarshalX in https://github.com/MarshalX/yandex-music-api/pull/633
+- Добавлена поддержка `Python 3.12` ([#628](https://github.com/MarshalX/yandex-music-api/pull/628)).
+- Добавлен fallback до `None` или пустого списка при данных неправильного типа ([#612](https://github.com/MarshalX/yandex-music-api/pull/612)).
+- Обновлён HTTP-заголовок версии приложения ([#592](https://github.com/MarshalX/yandex-music-api/pull/592), [#635](https://github.com/MarshalX/yandex-music-api/pull/635)).
+
+**Незначительные изменения и/или исправления**
+
+- Исправлен метод `fetch_lyrics_async` ([#627](https://github.com/MarshalX/yandex-music-api/pull/627)).
+- Исправлен тип поля `items_uri` в классе `Cover` ([#603](https://github.com/MarshalX/yandex-music-api/pull/603)).
+- Исправлена аннотация типа `de_list` и тесты на пустой список ([#612](https://github.com/MarshalX/yandex-music-api/pull/612)).
+
+**Ведение проекта**
+
+- Переезд на `ruff` и `ruff format` ([#625](https://github.com/MarshalX/yandex-music-api/pull/625), [#632](https://github.com/MarshalX/yandex-music-api/pull/632)).
+- Добавлен GitHub Actions Workflow для проверки актуальности генерируемого кода ([#624](https://github.com/MarshalX/yandex-music-api/pull/624)).
+- Упрощены GitHub Actions Workflow ([#623](https://github.com/MarshalX/yandex-music-api/pull/623)).
+- Удалено использование dev ветки ([#622](https://github.com/MarshalX/yandex-music-api/pull/622)).
+- Улучшены аннотации типов ([#626](https://github.com/MarshalX/yandex-music-api/pull/626)).
+- Исправление ошибок в `README` ([#599](https://github.com/MarshalX/yandex-music-api/pull/599), [#629](https://github.com/MarshalX/yandex-music-api/pull/629)).
+- Обновлена структура документации ([#633](https://github.com/MarshalX/yandex-music-api/pull/633)).
 
 ## Версия 2.1.0
 

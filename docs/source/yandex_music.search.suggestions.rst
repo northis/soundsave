@@ -1,7 +1,5 @@
-yandex\_music.search.suggestions
-================================
+Suggestions
+===========
 
 .. automodule:: yandex_music.search.suggestions
    :members:
-   :undoc-members:
-   :show-inheritance:

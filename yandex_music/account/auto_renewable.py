@@ -4,7 +4,7 @@ from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import ClientType, JSONType, Product, User
+    from yandex_music import ClientType, Product, User
 
 
 @model
@@ -35,25 +35,3 @@ class AutoRenewable(YandexMusicModel):
 
     def __post_init__(self) -> None:
         self._id_attrs = (self.expires, self.vendor, self.vendor_help_url, self.product, self.finished)
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['AutoRenewable']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.AutoRenewable`: Информация об автопродлении подписки.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Product, User
-
-        cls_data['product'] = Product.de_json(data.get('product'), client)
-        cls_data['master_info'] = User.de_json(data.get('master_info'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore

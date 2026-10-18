@@ -38,10 +38,10 @@ class Title(YandexMusicModel):
         if not cls.is_dict_model_data(data):
             return {}
 
-        titles: Dict[str, 'Title'] = {}
+        titles: Dict[str, Title] = {}
         for lang, raw_title in data.items():
             title = cls.de_json(raw_title, client)
-            if title:
+            if title is not None:
                 titles.update({lang: title})
 
         return titles

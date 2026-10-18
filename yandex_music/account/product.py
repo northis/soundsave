@@ -5,7 +5,7 @@ from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import ClientType, JSONType, Price
+    from yandex_music import ClientType, LicenceTextPart, Price
 
 
 @model
@@ -61,7 +61,7 @@ class Product(YandexMusicModel):
     fb_image: Optional[str] = None
     fb_name: Optional[str] = None
     family: Optional[bool] = None
-    features: List[str] = None
+    features: Optional[List[str]] = None
     description: Optional[str] = None
     available: Optional[bool] = None
     trial_available: Optional[bool] = None
@@ -70,11 +70,11 @@ class Product(YandexMusicModel):
     intro_price: Optional['Price'] = None
     start_period_duration: Optional[str] = None
     start_price: Optional['Price'] = None
-    licence_text_parts: List['Price'] = field(default_factory=list)
+    licence_text_parts: List['LicenceTextPart'] = field(default_factory=list)
     vendor_trial_available: Optional[bool] = None
     button_text: Optional[str] = None
     button_additional_text: Optional[str] = None
-    payment_method_types: List[str] = field(default_factory=list)
+    payment_method_types: Optional[List[str]] = field(default_factory=list)
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
@@ -87,27 +87,3 @@ class Product(YandexMusicModel):
             self.feature,
             self.debug,
         )
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Product']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.Product`: Продаваемый продукт.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import LicenceTextPart, Price
-
-        cls_data['price'] = Price.de_json(data.get('price'), client)
-        cls_data['intro_price'] = Price.de_json(data.get('intro_price'), client)
-        cls_data['start_price'] = Price.de_json(data.get('start_price'), client)
-        cls_data['licence_text_parts'] = LicenceTextPart.de_list(data.get('licence_text_parts'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore

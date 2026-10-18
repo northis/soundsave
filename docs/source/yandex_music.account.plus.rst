@@ -1,7 +1,5 @@
-yandex\_music.account.plus
-==========================
+Plus
+====
 
 .. automodule:: yandex_music.account.plus
    :members:
-   :undoc-members:
-   :show-inheritance:

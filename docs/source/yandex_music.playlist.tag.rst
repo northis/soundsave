@@ -1,7 +1,5 @@
-yandex\_music.playlist.tag
-==========================
+Tag
+===
 
 .. automodule:: yandex_music.playlist.tag
    :members:
-   :undoc-members:
-   :show-inheritance:

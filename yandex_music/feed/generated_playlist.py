@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from yandex_music import YandexMusicModel
 from yandex_music.utils import model
@@ -29,30 +29,9 @@ class GeneratedPlaylist(YandexMusicModel):
     ready: bool
     notify: bool
     data: Optional['Playlist']
-    description: Optional[list] = None
+    description: Optional[List['JSONType']] = None
     preview_description: Optional[str] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
         self._id_attrs = (self.type, self.ready, self.notify, self.data)
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['GeneratedPlaylist']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.GeneratedPlaylist`: Автоматически сгенерированный плейлист.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Playlist
-
-        cls_data['data'] = Playlist.de_json(data.get('data'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore

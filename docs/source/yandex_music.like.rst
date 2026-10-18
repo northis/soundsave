@@ -1,7 +1,5 @@
-yandex\_music.like
-==================
+Like
+====
 
 .. automodule:: yandex_music.like
    :members:
-   :undoc-members:
-   :show-inheritance:

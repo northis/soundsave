@@ -1,5 +1,5 @@
 from dataclasses import field
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from yandex_music import YandexMusicModel
 from yandex_music.utils import model
@@ -7,15 +7,20 @@ from yandex_music.utils import model
 if TYPE_CHECKING:
     from yandex_music import (
         Album,
+        AlbumActionButton,
         Artist,
+        ArtistLink,
         Chart,
         ClientType,
+        Clip,
         Cover,
+        CustomWave,
         JSONType,
         Playlist,
         PlaylistId,
         Stats,
         Track,
+        UpcomingAlbum,
         Video,
         Vinyl,
     )
@@ -42,6 +47,17 @@ class BriefInfo(YandexMusicModel):
         playlist_ids (:obj:`list` из :obj:`yandex_music.PlaylistId`): Уникальные идентификаторы плейлистов.
         stats (:obj:`yandex_music.Stats`, optional): Статистика прослушиваний за месяц.
         tracks_in_chart (:obj:`list` из :obj:`yandex_music.Chart`, optional): Треки в чарте.
+        action_button (:obj:`yandex_music.AlbumActionButton`, optional): Кнопка-действие для перехода по ссылке.
+        background_image_url (:obj:`str`, optional): Ссылка на фоновое изображение.
+        background_video_id (:obj:`str`, optional): Идентификатор фонового видео.
+        background_video_url (:obj:`str`, optional): Ссылка на фоновое видео.
+        bandlink_scanner_link (:obj:`yandex_music.ArtistLink`, optional): Ссылка на плейлисты с артистом в Bandlink.
+        clips (:obj:`list` из :obj:`yandex_music.Clip`): Клипы. Приходят только с параметром
+            `useClipDataFormat=true`.
+        custom_wave (:obj:`yandex_music.CustomWave`, optional): Моя волна по артисту.
+        has_trailer (:obj:`bool`, optional): Есть ли у артиста трейлер.
+        links (:obj:`list` из :obj:`yandex_music.ArtistLink`): Ссылки на страницы артиста.
+        upcoming_album (:obj:`yandex_music.UpcomingAlbum`, optional): Предстоящий релиз.
         client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
     """
 
@@ -54,13 +70,23 @@ class BriefInfo(YandexMusicModel):
     popular_tracks: List['Track']
     similar_artists: List['Artist']
     all_covers: List['Cover']
-    concerts: Any
+    concerts: 'JSONType'
     videos: List['Video']
     vinyls: List['Vinyl']
     has_promotions: bool
     playlist_ids: List['PlaylistId']
     stats: Optional['Stats'] = None
     tracks_in_chart: List['Chart'] = field(default_factory=list)
+    action_button: Optional['AlbumActionButton'] = None
+    background_image_url: Optional[str] = None
+    background_video_id: Optional[str] = None
+    background_video_url: Optional[str] = None
+    bandlink_scanner_link: Optional['ArtistLink'] = None
+    clips: List['Clip'] = field(default_factory=list)
+    custom_wave: Optional['CustomWave'] = None
+    has_trailer: Optional[bool] = None
+    links: List['ArtistLink'] = field(default_factory=list)
+    upcoming_album: Optional['UpcomingAlbum'] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
@@ -79,36 +105,3 @@ class BriefInfo(YandexMusicModel):
             self.has_promotions,
             self.playlist_ids,
         )
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['BriefInfo']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.BriefInfo`: Информация об артисте.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Album, Artist, Chart, Cover, Playlist, PlaylistId, Stats, Track, Video, Vinyl
-
-        cls_data['playlists'] = Playlist.de_list(data.get('playlists'), client)
-        cls_data['artist'] = Artist.de_json(data.get('artist'), client)
-        cls_data['similar_artists'] = Artist.de_list(data.get('similar_artists'), client)
-        cls_data['popular_tracks'] = Track.de_list(data.get('popular_tracks'), client)
-        cls_data['albums'] = Album.de_list(data.get('albums'), client)
-        cls_data['also_albums'] = Album.de_list(data.get('also_albums'), client)
-        cls_data['last_releases'] = Album.de_list(data.get('last_releases'), client)
-        cls_data['all_covers'] = Cover.de_list(data.get('all_covers'), client)
-        cls_data['playlist_ids'] = PlaylistId.de_list(data.get('playlist_ids'), client)
-        cls_data['videos'] = Video.de_list(data.get('videos'), client)
-        cls_data['tracks_in_chart'] = Chart.de_list(data.get('tracks_in_chart'), client)
-        cls_data['vinyls'] = Vinyl.de_list(data.get('vinyls'), client)
-        cls_data['stats'] = Stats.de_json(data.get('stats'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore

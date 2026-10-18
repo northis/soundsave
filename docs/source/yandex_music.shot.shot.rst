@@ -1,7 +1,5 @@
-yandex\_music.shot.shot
-=======================
+Shot
+====
 
 .. automodule:: yandex_music.shot.shot
    :members:
-   :undoc-members:
-   :show-inheritance:

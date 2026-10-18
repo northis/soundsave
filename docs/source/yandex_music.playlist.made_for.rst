@@ -1,7 +1,5 @@
-yandex\_music.playlist.made\_for
-================================
+MadeFor
+=======
 
 .. automodule:: yandex_music.playlist.made_for
    :members:
-   :undoc-members:
-   :show-inheritance:

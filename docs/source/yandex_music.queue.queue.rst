@@ -1,7 +1,5 @@
-yandex\_music.queue.queue
-=========================
+Queue
+=====
 
 .. automodule:: yandex_music.queue.queue
    :members:
-   :undoc-members:
-   :show-inheritance:

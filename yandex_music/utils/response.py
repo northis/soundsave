@@ -1,4 +1,8 @@
+"""Модель ответа API."""
+
 from typing import TYPE_CHECKING, Optional
+
+from typing_extensions import override
 
 from yandex_music import YandexMusicModel
 from yandex_music.utils import model
@@ -35,13 +39,14 @@ class Response(YandexMusicModel):
 
     def get_error(self) -> str:
         """:obj:`str`: Код ошибки вместе с описанием"""
-        return f'{self.error} {self.error_description if self.error_description else ""}'
+        return f'{self.error} {self.error_description if self.error_description is not None else ""}'
 
     def get_result(self) -> 'JSONType':
         """:obj:`dict`: Результат выполнения запроса. Данный для распаковки."""
         return self.data if self.result is None else self.result
 
     @classmethod
+    @override
     def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Response']:
         """Десериализация объекта.
 
@@ -55,10 +60,7 @@ class Response(YandexMusicModel):
         if not cls.is_dict_model_data(data):
             return None
 
-        cls_data = cls.cleanup_data(data, client)
-        cls_data['data'] = data.copy()
-        from yandex_music import InvocationInfo
+        cls_data = cls.de_nested(cls.cleanup_data(data, client), client)
+        cls_data['data'] = data
 
-        cls_data['invocation_info'] = InvocationInfo.de_json(data.get('invocation_info'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore
+        return cls.construct(cls_data, client)

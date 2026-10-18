@@ -1,7 +1,5 @@
-yandex\_music.playlist.user
-===========================
+User
+====
 
 .. automodule:: yandex_music.playlist.user
    :members:
-   :undoc-members:
-   :show-inheritance:

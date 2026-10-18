@@ -1,7 +1,5 @@
-yandex\_music.landing.promotion
-===============================
+Promotion
+=========
 
 .. automodule:: yandex_music.landing.promotion
    :members:
-   :undoc-members:
-   :show-inheritance:

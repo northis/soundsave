@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
-    from yandex_music import Account, Alert, ClientType, JSONType, Permissions, Plus, StationData, Subscription
+    from yandex_music import Account, Alert, ClientType, Permissions, Plus, StationData, Subscription
 
 
 @model
@@ -29,6 +29,7 @@ class Status(YandexMusicModel):
         experiment (:obj:`int`, optional): Включенная новая фича на аккаунте (её ID) TODO.
         pretrial_active (:obj:`bool`, optional): TODO.
         userhash (:obj:`str`, optional): Хэш-код идентификатора пользователя.
+        has_options (:obj:`list` из :obj:`str`, optional): Подключённые опции (например, `bookmate`).
         client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
     """
 
@@ -49,33 +50,8 @@ class Status(YandexMusicModel):
     experiment: Optional[int] = None
     pretrial_active: Optional[bool] = None
     userhash: Optional[str] = None
+    has_options: Optional[List[str]] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
         self._id_attrs = (self.account, self.permissions)
-
-    @classmethod
-    def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Status']:
-        """Десериализация объекта.
-
-        Args:
-            data (:obj:`dict`): Поля и значения десериализуемого объекта.
-            client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
-
-        Returns:
-            :obj:`yandex_music.Status`: Информация об аккаунте пользователя.
-        """
-        if not cls.is_dict_model_data(data):
-            return None
-
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import Account, Alert, Permissions, Plus, StationData, Subscription
-
-        cls_data['account'] = Account.de_json(data.get('account'), client)
-        cls_data['permissions'] = Permissions.de_json(data.get('permissions'), client)
-        cls_data['subscription'] = Subscription.de_json(data.get('subscription'), client)
-        cls_data['plus'] = Plus.de_json(data.get('plus'), client)
-        cls_data['station_data'] = StationData.de_json(data.get('station_data'), client)
-        cls_data['bar_below'] = Alert.de_json(data.get('bar_below'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore

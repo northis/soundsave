@@ -1,19 +1,24 @@
 from dataclasses import field
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from typing_extensions import override
 
 from yandex_music import YandexMusicModel
 from yandex_music.utils import model
 
 if TYPE_CHECKING:
     from yandex_music import (
+        AlbumActionButton,
         Artist,
         Brand,
         ClientType,
         Contest,
         Cover,
+        CoverDerivedColors,
         CustomWave,
         JSONType,
         MadeFor,
+        MadeForUser,
         OpenGraphData,
         Pager,
         PlayCounter,
@@ -23,6 +28,7 @@ if TYPE_CHECKING:
         TrackShort,
         User,
     )
+    from yandex_music.playlist.playlist_availability import PlaylistAvailability
 
 
 @model
@@ -41,17 +47,19 @@ class Playlist(YandexMusicModel):
         Известные значения `type`: `missedLikes`, `recentTracks`.
 
     Attributes:
-        owner (:obj:`yandex_music.User`, optional): Владелец плейлиста.
         cover (:obj:`yandex_music.Cover`, optional): Обложка альбома.
+        owner (:obj:`yandex_music.User`, optional): Владелец плейлиста. Не приходит у плейлистов артиста
+            (:func:`yandex_music.Client.artists_brief_info`).
         made_for (:obj:`yandex_music.MadeFor`, optional): Пользователь для которого был создан плейлист. Присутствует
             только у персональных плейлистов.
         play_counter (:obj:`yandex_music.PlayCounter`, optional): Счётчик дней. Присутствует только у плейлиста дня.
-        playlist_absence (:obj:`yandex_music.PlaylistAbsence`, optional): Причина отсутствия плейлиста.
+        playlist_absence (:obj:`yandex_music.PlaylistAbsence`, optional): Причина отсутствия плейлиста. Не приходит
+            в чарте (:func:`yandex_music.Client.chart`) и фиде (:func:`yandex_music.Client.feed`).
         uid (:obj:`int`, optional): Идентификатор владельца плейлиста.
         kind (:obj:`int`, optional): Идентификатор плейлиста.
         title (:obj:`str`, optional): Название плейлиста.
         track_count (:obj:`int`, optional): Количество треков.
-        tags (:obj:`list`, optional): Список тегов плейлиста.
+        tags (:obj:`list` из :obj:`dict`, optional): Список тегов плейлиста.
         revision (:obj:`int`, optional): Актуальность данных TODO.
         snapshot (:obj:`int`, optional): Версия плейлиста. Увеличивается на 1 при каждом изменении.
         visibility (:obj:`str`, optional): Видимость плейлиста.
@@ -100,19 +108,29 @@ class Playlist(YandexMusicModel):
         regions: Регион TODO.
         custom_wave (:obj:'yandex_music.CustomWave`, optional): Описание плейлиста. TODO.
         pager (:obj:`yandex_music.Pager`, optional): Пагинатор.
+        has_trailer (:obj:`bool`, optional): Есть ли у плейлиста трейлер.
+        trailer (:obj:`yandex_music.PlaylistAvailability`, optional): Доступность трейлера плейлиста.
+        background_video_url (:obj:`str`, optional): Ссылка на фоновое видео.
+        background_video_id (:obj:`str`, optional): Идентификатор фонового видео.
+        background_image_url (:obj:`str`, optional): Ссылка на фоновое изображение.
+        action_button (:obj:`yandex_music.AlbumActionButton`, optional): Кнопка-действие для перехода по ссылке.
+        artist_playlist_type (:obj:`str`, optional): Тип плейлиста артиста (`TOP`, `SIMILAR`).
+        child_content (:obj:`bool`, optional): Является ли плейлист детским контентом.
+        derived_colors (:obj:`yandex_music.CoverDerivedColors`, optional): Производные цвета обложки плейлиста.
+        made_for_user (:obj:`yandex_music.MadeForUser`, optional): Признак персонального плейлиста.
         client (:obj:`yandex_music.Client`, optional): Клиент Yandex Music.
     """
 
-    owner: Optional['User']
     cover: Optional['Cover']
-    made_for: Optional['MadeFor']
-    play_counter: Optional['PlayCounter']
-    playlist_absence: Optional['PlaylistAbsence']
+    owner: Optional['User'] = None
+    made_for: Optional['MadeFor'] = None
+    play_counter: Optional['PlayCounter'] = None
+    playlist_absence: Optional['PlaylistAbsence'] = None
     uid: Optional[int] = None
     kind: Optional[int] = None
     title: Optional[str] = None
     track_count: Optional[int] = None
-    tags: Optional[list] = None
+    tags: Optional[List[Dict[str, str]]] = None
     revision: Optional[int] = None
     snapshot: Optional[int] = None
     visibility: Optional[str] = None
@@ -144,7 +162,7 @@ class Playlist(YandexMusicModel):
     top_artist: List['Artist'] = field(default_factory=list)
     recent_tracks: List['TrackId'] = field(default_factory=list)
     tracks: List['TrackShort'] = field(default_factory=list)
-    prerolls: Optional[list] = None
+    prerolls: Optional[List['JSONType']] = None
     likes_count: Optional[int] = None
     similar_playlists: List['Playlist'] = field(default_factory=list)
     last_owner_playlists: List['Playlist'] = field(default_factory=list)
@@ -160,6 +178,16 @@ class Playlist(YandexMusicModel):
     regions: Any = None
     custom_wave: Optional['CustomWave'] = None
     pager: Optional['Pager'] = None
+    has_trailer: Optional[bool] = None
+    trailer: Optional['PlaylistAvailability'] = None
+    background_video_url: Optional[str] = None
+    background_video_id: Optional[str] = None
+    background_image_url: Optional[str] = None
+    action_button: Optional['AlbumActionButton'] = None
+    artist_playlist_type: Optional[str] = None
+    child_content: Optional[bool] = None
+    derived_colors: Optional['CoverDerivedColors'] = None
+    made_for_user: Optional['MadeForUser'] = None
     client: Optional['ClientType'] = None
 
     def __post_init__(self) -> None:
@@ -168,33 +196,37 @@ class Playlist(YandexMusicModel):
     @property
     def is_mine(self) -> bool:
         """Является ли плейлист моим."""
-        if not self.owner or not self.client:
+        if self.owner is None or self.client is None:
             return False
         return str(self.owner.uid) == self.client.account_uid
 
     @property
     def playlist_id(self) -> str:
         """Полный ID плейлиста."""
-        if self.owner:
+        if self.owner is not None:
             return f'{self.owner.uid}:{self.kind}'
         return str(self.kind)
 
     def get_recommendations(self, *args: Any, **kwargs: Any) -> Optional['PlaylistRecommendations']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists_recommendations(playlist.kind, playlist.owner.uid, *args, **kwargs)
+        Сокращение для::
+
+            client.users_playlists_recommendations(playlist.kind, playlist.owner.uid, *args, **kwargs)
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert self.valid_client(self.client)
         return self.client.users_playlists_recommendations(self.kind, self.owner.uid, *args, **kwargs)
 
     async def get_recommendations_async(self, *args: Any, **kwargs: Any) -> Optional['PlaylistRecommendations']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_playlists_recommendations(playlist.kind, playlist.owner.uid, *args, **kwargs)
+        Сокращение для::
+
+            await client.users_playlists_recommendations(playlist.kind, playlist.owner.uid, *args, **kwargs)
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert self.valid_async_client(self.client)
         return await self.client.users_playlists_recommendations(self.kind, self.owner.uid, *args, **kwargs)
@@ -320,9 +352,11 @@ class Playlist(YandexMusicModel):
         return await self.client.request.retrieve(self.get_og_image_url(size))
 
     def rename(self, name: str, *args: Any, **kwargs: Any) -> None:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists_name(playlist.kind, name, *args, **kwargs)
+        Сокращение для::
+
+            client.users_playlists_name(playlist.kind, name, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         assert isinstance(self.kind, int)
@@ -332,9 +366,11 @@ class Playlist(YandexMusicModel):
         self.__dict__.update(client.users_playlists_name(kind, name, *args, **kwargs).__dict__)
 
     async def rename_async(self, name: str, *args: Any, **kwargs: Any) -> None:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists_name(playlist.kind, name, *args, **kwargs)
+        Сокращение для::
+
+            client.users_playlists_name(playlist.kind, name, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         assert isinstance(self.kind, int)
@@ -344,33 +380,41 @@ class Playlist(YandexMusicModel):
         self.__dict__.update((await client.users_playlists_name(kind, name, *args, **kwargs)).__dict__)
 
     def like(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_playlists_add(playlist.playlist_id, user.id, *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_playlists_add(playlist.playlist_id, user.id, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.users_likes_playlists_add(self.playlist_id, self.client.account_uid, *args, **kwargs)
 
     async def like_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_playlists_add(playlist.playlist_id, user.id, *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_playlists_add(playlist.playlist_id, user.id, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_playlists_add(self.playlist_id, self.client.account_uid, *args, **kwargs)
 
     def dislike(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_likes_playlists_remove(playlist.playlist_id, user.id, *args, **kwargs)
+        Сокращение для::
+
+            client.users_likes_playlists_remove(playlist.playlist_id, user.id, *args, **kwargs)
         """
         assert self.valid_client(self.client)
         return self.client.users_likes_playlists_remove(self.playlist_id, self.client.account_uid, *args, **kwargs)
 
     async def dislike_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_likes_playlists_remove(playlist.playlist_id, user.id, *args, **kwargs)
+        Сокращение для::
+
+            await client.users_likes_playlists_remove(playlist.playlist_id, user.id, *args, **kwargs)
         """
         assert self.valid_async_client(self.client)
         return await self.client.users_likes_playlists_remove(
@@ -378,11 +422,13 @@ class Playlist(YandexMusicModel):
         )
 
     def fetch_tracks(self, *args: Any, **kwargs: Any) -> List['TrackShort']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists(playlist.kind, playlist.owner.id, *args, **kwargs).tracks
+        Сокращение для::
+
+            client.users_playlists(playlist.kind, playlist.owner.id, *args, **kwargs).tracks
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert self.valid_client(self.client)
 
@@ -391,11 +437,13 @@ class Playlist(YandexMusicModel):
         return playlist.tracks
 
     async def fetch_tracks_async(self, *args: Any, **kwargs: Any) -> List['TrackShort']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_playlists(playlist.kind, playlist.owner.id, *args, **kwargs).tracks
+        Сокращение для::
+
+            await client.users_playlists(playlist.kind, playlist.owner.id, *args, **kwargs).tracks
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert self.valid_async_client(self.client)
 
@@ -404,12 +452,17 @@ class Playlist(YandexMusicModel):
         return playlist.tracks
 
     def insert_track(self, track_id: int, album_id: int, **kwargs: Any) -> Optional['Playlist']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists_insert_track(self.kind, track_id, album_id, user_id=self.owner.uid,
-        revision=self.revision, *args, **kwargs)
+        Сокращение для::
+
+            client.users_playlists_insert_track(
+                self.kind, track_id, album_id,
+                user_id=self.owner.uid, revision=self.revision,
+                *args, **kwargs,
+            )
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert isinstance(self.revision, int)
         assert self.valid_client(self.client)
@@ -418,12 +471,17 @@ class Playlist(YandexMusicModel):
         )
 
     async def insert_track_async(self, track_id: int, album_id: int, **kwargs: Any) -> Optional['Playlist']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_playlists_insert_track(self.kind, track_id, album_id, user_id=self.owner.uid,
-        revision=self.revision, *args, **kwargs)
+        Сокращение для::
+
+            await client.users_playlists_insert_track(
+                self.kind, track_id, album_id,
+                user_id=self.owner.uid, revision=self.revision,
+                *args, **kwargs,
+            )
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert isinstance(self.revision, int)
         assert self.valid_async_client(self.client)
@@ -432,11 +490,13 @@ class Playlist(YandexMusicModel):
         )
 
     def delete_tracks(self, from_: int, to: int, *args: Any, **kwargs: Any) -> Optional['Playlist']:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists_delete_track(self.kind, from_, to, self.revision, self.owner.uid, *args, **kwargs)
+        Сокращение для::
+
+            client.users_playlists_delete_track(self.kind, from_, to, self.revision, self.owner.uid, *args, **kwargs)
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert isinstance(self.revision, int)
         assert self.valid_client(self.client)
@@ -445,11 +505,15 @@ class Playlist(YandexMusicModel):
         )
 
     async def delete_tracks_async(self, from_: int, to: int, *args: Any, **kwargs: Any) -> Optional['Playlist']:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_playlists_delete_track(self.kind, from_, to, self.revision, self.owner.uid, *args, **kwargs)
+        Сокращение для::
+
+            await client.users_playlists_delete_track(
+                self.kind, from_, to, self.revision, self.owner.uid, *args, **kwargs,
+            )
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert isinstance(self.revision, int)
         assert self.valid_async_client(self.client)
@@ -458,26 +522,31 @@ class Playlist(YandexMusicModel):
         )
 
     def delete(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        client.users_playlists_delete(self.kind, self.owner.uid)
+        Сокращение для::
+
+            client.users_playlists_delete(self.kind, self.owner.uid)
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert self.valid_client(self.client)
         return self.client.users_playlists_delete(self.kind, self.owner.uid, *args, **kwargs)
 
     async def delete_async(self, *args: Any, **kwargs: Any) -> bool:
-        """Сокращение для::
+        """Сокращение.
 
-        await client.users_playlists_delete(self.kind, self.owner.uid)
+        Сокращение для::
+
+            await client.users_playlists_delete(self.kind, self.owner.uid)
         """
-        assert self.owner
+        assert self.owner is not None
         assert isinstance(self.kind, int)
         assert self.valid_async_client(self.client)
         return await self.client.users_playlists_delete(self.kind, self.owner.uid, *args, **kwargs)
 
     @classmethod
+    @override
     def de_json(cls, data: 'JSONType', client: 'ClientType') -> Optional['Playlist']:
         """Десериализация объекта.
 
@@ -491,49 +560,20 @@ class Playlist(YandexMusicModel):
         if not cls.is_dict_model_data(data):
             return None
 
-        cls_data = cls.cleanup_data(data, client)
-        from yandex_music import (
-            Artist,
-            Brand,
-            Contest,
-            Cover,
-            CustomWave,
-            MadeFor,
-            OpenGraphData,
-            Pager,
-            PlayCounter,
-            PlaylistAbsence,
-            TrackId,
-            TrackShort,
-            User,
-        )
+        cls_data = cls.de_nested(cls.cleanup_data(data, client), client)
 
-        cls_data['owner'] = User.de_json(data.get('owner'), client)
-        cls_data['cover'] = Cover.de_json(data.get('cover'), client)
-        cls_data['cover_without_text'] = Cover.de_json(data.get('cover_without_text'), client)
-        cls_data['made_for'] = MadeFor.de_json(data.get('made_for'), client)
-        cls_data['tracks'] = TrackShort.de_list(data.get('tracks'), client)
-        cls_data['recent_tracks'] = TrackId.de_list(data.get('recent_tracks'), client)
-        cls_data['play_counter'] = PlayCounter.de_json(data.get('play_counter'), client)
-        cls_data['top_artist'] = Artist.de_list(data.get('top_artist'), client)
-        cls_data['contest'] = Contest.de_json(data.get('contest'), client)
-        cls_data['og_data'] = OpenGraphData.de_json(data.get('og_data'), client)
-        cls_data['dummy_cover'] = Cover.de_json(data.get('dummy_cover'), client)
-        cls_data['dummy_rollover_cover'] = Cover.de_json(data.get('dummy_rollover_cover'), client)
-        cls_data['branding'] = Brand.de_json(data.get('branding'), client)
+        from yandex_music import PlaylistAbsence
 
-        cls_data['similar_playlists'] = Playlist.de_list(data.get('similar_playlists'), client)
-        cls_data['last_owner_playlists'] = Playlist.de_list(data.get('last_owner_playlists'), client)
+        # Yandex API typo: sends "playlistAbsense" instead of "playlistAbsence".
+        # The typo normalizes to 'playlist_absense' which isn't a known field,
+        # so cleanup_data drops it. Check raw data for the original key.
+        for _typo_key in ('playlistAbsense', 'playlist_absense'):
+            _typo_val = data.get(_typo_key)
+            if bool(_typo_val):
+                cls_data['playlist_absence'] = PlaylistAbsence.de_json(_typo_val, client)
+                break
 
-        cls_data['playlist_absence'] = PlaylistAbsence.de_json(data.get('playlist_absence'), client)  # на случай фикса
-        if data.get('playlist_absense'):  # очепятка яндуха
-            cls_data['playlist_absence'] = PlaylistAbsence.de_json(data.get('playlist_absense'), client)
-            cls_data.pop('playlist_absense')
-
-        cls_data['custom_wave'] = CustomWave.de_json(data.get('custom_wave'), client)
-        cls_data['pager'] = Pager.de_json(data.get('pager'), client)
-
-        return cls(client=client, **cls_data)  # type: ignore
+        return cls.construct(cls_data, client)
 
     # camelCase псевдонимы
 

@@ -1,7 +1,5 @@
-yandex\_music.track.meta\_data
-==============================
+MetaData
+========
 
 .. automodule:: yandex_music.track.meta_data
    :members:
-   :undoc-members:
-   :show-inheritance:
