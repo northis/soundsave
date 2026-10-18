@@ -85,9 +85,10 @@ used the same `v1.0.0` tag name for different commits. Fork releases use the
 
 ## Roadmap
 
-* **1.2** — audit the archive for tracks that are no longer available in 320
-  kbps and try to replace them with better copies found via YouTube Music
-  (`ytmusicapi`). See the design proposal in
+* **1.2** — audit the archive for tracks below the target quality. YouTube
+  Music caps at 256 kbps AAC/Opus, so it is a fallback for perceptual
+  improvement, not a source of true 320 kbps MP3; true 320 requires lossless
+  sources. See the design proposal in
   [`docs/proposals/bitrate-upgrade.md`](docs/proposals/bitrate-upgrade.md).
 
 ## License
