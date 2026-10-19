@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+# Soundsave runtime data
+.soundsave/
+*.sqlite3
+*.sqlite3-journal
+report.csv
+report.json
+

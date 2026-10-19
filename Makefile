@@ -1,33 +1,17 @@
-# makefile for Yandex Music project
+.PHONY: install test lint format check
 
-RUN ?= uv run
-
-ruff:
-	$(RUN) ruff check . --fix
-
-pyrefly:
-	$(RUN) pyrefly check
-
-ruff_format:
-	$(RUN) ruff format .
-
-gen_sync:
-	$(RUN) python generate_sync_version.py
-
-gen_alias:
-	$(RUN) python generate_camel_case_aliases.py
+install:
+	python -m pip install -e ".[dev]"
 
 test:
-	$(RUN) pytest
+	pytest
 
-gen:
-	make gen_sync && make gen_alias
+lint:
+	ruff check .
 
-g:
-	make gen
+format:
+	ruff format .
 
-all:
-	make g && make ruff && make ruff_format
-
-a:
-	make all
+check: lint
+	ruff format --check .
+	pytest

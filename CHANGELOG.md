@@ -1,10 +1,47 @@
 # Changelog
 
-All notable changes to the organizer CLI are documented here. The vendored
-`yandex-music-api` library keeps its own history in [`CHANGES.md`](CHANGES.md).
+All notable changes to Soundsave are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [2.0.0] - 2026-10-19
+
+### Changed
+
+- The project is now a standalone application named **Soundsave**. The
+  vendored `yandex-music-api` sources were removed; the library is installed
+  from PyPI as `yandex-music>=3.2.2,<4`.
+- The code moved from a single root script to the `src/soundsave` package with
+  a `soundsave` console entry point.
+- Python 3.10+ is required.
+- Organizer releases are superseded by application releases.
+
+### Added
+
+- `soundsave sync` — the previous organizer behaviour: download new Yandex
+  Music playlist tracks with tags, cover art and lyrics.
+- `soundsave audit` — scan the archive for tracks below 320 kbps MP3, search
+  Zvuk and write CSV/JSON reports. Read-only.
+- `soundsave upgrade` — match Zvuk candidates, download a 320 kbps MP3 or FLAC
+  stream, validate it, copy the original tags, back up the old file and
+  atomically replace it.
+- Zvuk provider with direct (non-DRM) `high`/`flac` stream resolution and
+  optional `ffmpeg` fallback for FLAC → MP3.
+- Quality policies `report`, `best` and `true320`; target formats `mp3`,
+  `flac` and `keep`.
+- Fuzzy matching with artist/title/duration/album scoring, hard duration and
+  version filters, and ambiguity detection.
+- SQLite manifest (`.soundsave/manifest.sqlite3`), timestamped backups and a
+  temporary download directory under `.soundsave/`.
+- Unit tests for matching, quality policy, filenames, manifest, the Zvuk
+  provider, the upgrade pipeline and `sync`.
+
+### Removed
+
+- Vendored `yandex_music/` package, upstream docs, examples, codegen scripts
+  and the upstream release workflows.
+- The `yandex_music_organizer_api.py` root script (use `soundsave sync`).
 
 ## [1.1.0] - 2026-10-19
 
