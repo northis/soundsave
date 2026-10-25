@@ -2,21 +2,34 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from mutagen.id3 import ID3, TALB, TIT2, TPE1
+import pytest
+from mutagen.id3 import APIC, ID3, PRIV, TALB, TIT2, TPE1, TXXX, USLT
 
 from soundsave.archive import (
+    ArchiveError,
+    TagData,
     build_filename,
     copy_tags,
+    get_image_type,
     parse_filename,
     read_local_track,
     read_tag_data,
     sanitize_component,
+    update_tag_data,
 )
 
 
 def make_mp3(path: Path, *, bitrate_index: int, frame_length: int, frames: int = 20) -> None:
     header = bytes((0xFF, 0xFB, bitrate_index << 4, 0x00))
     path.write_bytes((header + b'\x00' * (frame_length - 4)) * frames)
+
+
+def make_flac(path: Path) -> None:
+    packed = (44100 << 44) | (15 << 36)
+    streaminfo = (
+        (4096).to_bytes(2, 'big') + (4096).to_bytes(2, 'big') + b'\x00' * 6 + packed.to_bytes(8, 'big') + b'\x00' * 16
+    )
+    path.write_bytes(b'fLaC' + bytes((0x80,)) + (34).to_bytes(3, 'big') + streaminfo)
 
 
 def write_tags(path: Path) -> None:
@@ -123,3 +136,158 @@ class TestCopyTags:
         assert tags.title == 'Saturnine'
         assert tags.artists == ['The Gathering']
         assert tags.album == 'Mandylion'
+
+
+class TestGetImageType:
+    def test_jpeg(self) -> None:
+        assert get_image_type(b'\xff\xd8\xffdata') == 'image/jpeg'
+
+    def test_png(self) -> None:
+        assert get_image_type(b'\x89PNG\r\n\x1a\ndata') == 'image/png'
+
+    def test_default(self) -> None:
+        assert get_image_type(b'unknown') == 'image/jpeg'
+
+
+class TestUpdateTagData:
+    def test_fills_only_empty_fields(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        tags = ID3()
+        tags.add(TIT2(encoding=3, text='Saturnine'))
+        tags.add(TPE1(encoding=3, text=['The Gathering']))
+        tags.save(path)
+
+        changed = update_tag_data(
+            path,
+            TagData(title='Another title', artists=['Another artist'], album='Mandylion'),
+        )
+
+        assert changed
+        data = read_tag_data(path)
+        assert data.title == 'Saturnine'
+        assert data.artists == ['The Gathering']
+        assert data.album == 'Mandylion'
+
+    def test_returns_false_when_nothing_to_fill(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        tags = ID3()
+        tags.add(TIT2(encoding=3, text='Saturnine'))
+        tags.save(path)
+
+        assert not update_tag_data(path, TagData(title='Saturnine'))
+
+    def test_preserves_unknown_frames(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        tags = ID3()
+        tags.add(TXXX(encoding=3, desc='foo', text='bar'))
+        tags.add(PRIV(owner='owner', data=b'data'))
+        tags.save(path)
+
+        assert update_tag_data(path, TagData(album='Mandylion'))
+
+        updated = ID3(path)
+        assert updated.getall('TXXX')[0].text == ['bar']
+        assert updated.getall('PRIV')[0].data == b'data'
+
+    def test_adds_front_cover_only_when_missing(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        cover = b'\xff\xd8\xfffake-cover'
+
+        assert update_tag_data(path, TagData(cover=cover, cover_mime='image/jpeg'))
+        data = read_tag_data(path)
+        assert data.cover == cover
+        assert data.cover_type == 3
+
+        assert not update_tag_data(path, TagData(cover=b'other', cover_mime='image/jpeg'))
+        assert read_tag_data(path).cover == cover
+
+    def test_preserves_back_cover(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        tags = ID3()
+        tags.add(APIC(encoding=3, mime='image/jpeg', type=4, desc='back', data=b'back'))
+        tags.save(path)
+
+        assert update_tag_data(path, TagData(cover=b'front', cover_mime='image/jpeg'))
+
+        pictures = ID3(path).getall('APIC')
+        assert len(pictures) == 2
+        assert {picture.type for picture in pictures} == {3, 4}
+        assert read_tag_data(path).cover_type == 3
+
+    def test_detects_front_cover_after_back_cover(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        tags = ID3()
+        tags.add(APIC(encoding=3, mime='image/jpeg', type=4, desc='back', data=b'back'))
+        tags.add(APIC(encoding=3, mime='image/jpeg', type=3, desc='front', data=b'front'))
+        tags.save(path)
+
+        assert not update_tag_data(path, TagData(cover=b'new', cover_mime='image/jpeg'))
+        assert read_tag_data(path).cover == b'front'
+
+    def test_adds_lyrics_only_when_missing(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+
+        assert update_tag_data(path, TagData(lyrics='first line'))
+        assert read_tag_data(path).lyrics == 'first line'
+
+        assert not update_tag_data(path, TagData(lyrics='other line'))
+        assert read_tag_data(path).lyrics == 'first line'
+
+    def test_keeps_non_empty_second_lyrics_frame(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+        tags = ID3()
+        tags.add(USLT(encoding=3, lang='eng', desc='empty', text=''))
+        tags.add(USLT(encoding=3, lang='eng', desc='full', text='existing'))
+        tags.save(path)
+
+        assert not update_tag_data(path, TagData(lyrics='new'))
+        assert read_tag_data(path).lyrics == 'existing'
+        assert {str(frame.text) for frame in ID3(path).getall('USLT')} == {'', 'existing'}
+
+    def test_flac(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.flac'
+        make_flac(path)
+        cover = b'\xff\xd8\xffcover'
+
+        changed = update_tag_data(
+            path,
+            TagData(
+                title='Saturnine',
+                artists=['The Gathering'],
+                album='Mandylion',
+                lyrics='text',
+                cover=cover,
+                cover_mime='image/jpeg',
+                url='https://music.yandex.ru/album/10/track/123',
+            ),
+        )
+
+        assert changed
+        data = read_tag_data(path)
+        assert data.title == 'Saturnine'
+        assert data.artists == ['The Gathering']
+        assert data.album == 'Mandylion'
+        assert data.lyrics == 'text'
+        assert data.cover == cover
+        assert data.cover_type == 3
+        assert data.url == 'https://music.yandex.ru/album/10/track/123'
+        assert not update_tag_data(path, TagData(title='Another title'))
+
+    def test_rejects_unsupported_format(self, tmp_path: Path) -> None:
+        with pytest.raises(ArchiveError, match='Unsupported audio format'):
+            update_tag_data(tmp_path / '0001. Artist - Title.wav', TagData())
+
+    def test_rejects_unsupported_cover_mode(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path, bitrate_index=9, frame_length=417)
+
+        with pytest.raises(ValueError, match='Unsupported cover mode'):
+            update_tag_data(path, TagData(), cover_mode='replace')

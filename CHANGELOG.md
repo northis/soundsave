@@ -5,6 +5,22 @@ All notable changes to Soundsave are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `soundsave tags` — checks the existing archive against Yandex Music and,
+  with `--apply`, fills only missing tags, front cover art and lyrics. It never
+  downloads audio, renames files or overwrites non-empty values; `TRCK`/`TPOS`
+  remain local archive data.
+
+### Changed
+
+- `soundsave sync` now prefers a genuine 320 kbps MP3 stream from Yandex
+  Music and falls back to Zvuk when Yandex only offers a lower bitrate. If
+  Zvuk has no confident match or cannot provide 320 kbps, the best Yandex
+  stream is used so that the track is still archived.
+
 ## [2.0.0] - 2026-10-19
 
 ### Changed

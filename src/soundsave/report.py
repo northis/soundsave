@@ -32,10 +32,10 @@ class ReportRow:
     error: str | None = None
 
 
-def write_csv(path: Path, rows: list[ReportRow]) -> Path:
+def write_csv(path: Path, rows: list[object], row_type: type = ReportRow) -> Path:
     """Write *rows* to *path* as CSV."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    columns = [field.name for field in fields(ReportRow)]
+    columns = [field.name for field in fields(row_type)]
     with path.open('w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=columns)
         writer.writeheader()
@@ -44,7 +44,7 @@ def write_csv(path: Path, rows: list[ReportRow]) -> Path:
     return path
 
 
-def write_json(path: Path, rows: list[ReportRow]) -> Path:
+def write_json(path: Path, rows: list[object]) -> Path:
     """Write *rows* to *path* as JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(

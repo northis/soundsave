@@ -8,17 +8,43 @@ import pytest
 
 from soundsave import sync
 from soundsave.config import Config
+from soundsave.domain import AudioQuality, Candidate
+from soundsave.downloader import DownloadError
 
 
-def make_track(track_id: int = 1, title: str = 'Title', artist: str = 'Artist') -> Any:
-    return SimpleNamespace(
+class FakeModel(SimpleNamespace):
+    """A Yandex Music model stub that supports the ``obj['key']`` accessor."""
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+
+class FakeDownloadInfo:
+    def __init__(self, bitrate: int = 192, codec: str = 'mp3') -> None:
+        self.bitrate_in_kbps = bitrate
+        self.codec = codec
+
+    def download(self, path: str) -> None:
+        Path(path).write_bytes(b'fake mp3')
+
+
+def make_track(
+    track_id: int = 1,
+    title: str = 'Title',
+    artist: str = 'Artist',
+    *,
+    infos: list[FakeDownloadInfo] | None = None,
+) -> Any:
+    return FakeModel(
         id=track_id,
         title=title,
         version=None,
-        artists=[SimpleNamespace(name=artist)],
+        artists=[FakeModel(name=artist)],
         albums=[],
         lyrics_info=None,
         cover_uri=None,
+        duration_ms=180_000,
+        get_download_info=lambda: list(infos) if infos is not None else [FakeDownloadInfo()],
     )
 
 
@@ -101,6 +127,26 @@ class TestTrackIdentifier:
         assert sync.build_track_identifier(track) == 'a-b-ac-dc- live'
 
 
+class TestBuildZvukQuery:
+    def test_uses_yandex_metadata(self) -> None:
+        track = make_track(2, 'Song', 'Artist')
+        track.albums = [FakeModel(title='Album', version=None)]
+        track.duration_ms = 245_000
+
+        query = sync.build_zvuk_query(track)
+
+        assert query.artist == 'Artist'
+        assert query.title == 'Song'
+        assert query.album == 'Album'
+        assert query.duration_s == 245.0
+
+    def test_keeps_version_suffix(self) -> None:
+        track = make_track(2, 'Song', 'Artist')
+        track.version = 'Live'
+
+        assert sync.build_zvuk_query(track).title == 'Song (Live)'
+
+
 class TestRunSync:
     def test_dry_run_does_not_download(
         self,
@@ -133,7 +179,7 @@ class TestRunSync:
             [make_track(2, 'New 2'), make_track(1, 'New 1'), make_track(3, 'Existing', 'Old')],
         )
 
-        def fake_download(track: Any, destination: Path) -> Path:
+        def fake_download(track: Any, destination: Path, **kwargs: object) -> Path:
             path = destination / f'.soundsave-{track.id}.mp3'
             path.write_bytes(b'fake mp3')
             return path
@@ -166,3 +212,98 @@ class TestRunSync:
         sync.run_sync(make_config(tmp_path))
 
         assert [path.name for path in tmp_path.glob('*.mp3')] == ['0001. Artist - Same.mp3']
+
+
+class FakeProvider:
+    name = 'zvuk'
+
+    def __init__(self, candidates: list[Candidate] | None = None) -> None:
+        self.candidates = candidates or []
+        self.queries: list[Any] = []
+
+    def search(self, query: Any, limit: int = 10) -> list[Candidate]:
+        self.queries.append(query)
+        return self.candidates
+
+    def get_stream_url(self, candidate: Candidate, quality: str) -> str:
+        raise AssertionError('download_best_stream must be monkeypatched in these tests')
+
+
+def make_candidate(title: str = 'Title', artist: str = 'Artist', duration: float = 180.0) -> Candidate:
+    return Candidate(
+        provider='zvuk',
+        provider_id='zvuk-1',
+        title=title,
+        artists=(artist,),
+        duration_s=duration,
+    )
+
+
+class TestDownloadTrack:
+    def test_yandex_320_skips_zvuk(self, tmp_path: Path) -> None:
+        track = make_track(infos=[FakeDownloadInfo(bitrate=320)])
+        provider = FakeProvider([make_candidate()])
+
+        path = sync.download_track(track, tmp_path, provider=provider)
+
+        assert path is not None
+        assert path.name == '.soundsave-1.mp3'
+        assert provider.queries == []
+
+    def test_below_320_uses_zvuk(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        track = make_track(infos=[FakeDownloadInfo(bitrate=192)])
+        provider = FakeProvider([make_candidate()])
+
+        def fake_download_best(*args: object, **kwargs: object) -> tuple[Path, AudioQuality, str]:
+            destination = kwargs['temporary_dir']
+            stem = kwargs['stem']
+            assert isinstance(destination, Path)
+            assert isinstance(stem, str)
+            path = destination / f'{stem}.mp3'
+            path.write_bytes(b'fake mp3')
+            return path, AudioQuality('mp3', 320), 'mp3'
+
+        monkeypatch.setattr(sync, 'download_best_stream', fake_download_best)
+
+        path = sync.download_track(track, tmp_path, provider=provider)
+
+        assert path is not None
+        assert path.name == '.soundsave-1-zvuk.mp3'
+        assert len(provider.queries) == 1
+        assert provider.queries[0].artist == 'Artist'
+        assert provider.queries[0].title == 'Title'
+
+    def test_zvuk_without_match_falls_back_to_yandex(self, tmp_path: Path) -> None:
+        track = make_track(infos=[FakeDownloadInfo(bitrate=192)])
+        provider = FakeProvider([])
+
+        path = sync.download_track(track, tmp_path, provider=provider)
+
+        assert path is not None
+        assert path.name == '.soundsave-1.mp3'
+
+    def test_zvuk_download_failure_falls_back_to_yandex(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        track = make_track(infos=[FakeDownloadInfo(bitrate=192)])
+        provider = FakeProvider([make_candidate()])
+
+        def fail_download(*args: object, **kwargs: object) -> None:
+            raise DownloadError('no 320 kbps stream')
+
+        monkeypatch.setattr(sync, 'download_best_stream', fail_download)
+
+        path = sync.download_track(track, tmp_path, provider=provider)
+
+        assert path is not None
+        assert path.name == '.soundsave-1.mp3'
+
+    def test_without_provider_uses_yandex(self, tmp_path: Path) -> None:
+        track = make_track(infos=[FakeDownloadInfo(bitrate=192)])
+
+        path = sync.download_track(track, tmp_path)
+
+        assert path is not None
+        assert path.name == '.soundsave-1.mp3'

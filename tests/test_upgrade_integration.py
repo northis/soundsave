@@ -62,7 +62,7 @@ def test_full_replace_pipeline(tmp_path: Path, monkeypatch: object) -> None:
         shutil.copy2(downloaded, destination)
         return destination
 
-    monkeypatch.setattr('soundsave.upgrade.download_file', fake_download)  # type: ignore[attr-defined]
+    monkeypatch.setattr('soundsave.downloader.download_file', fake_download)  # type: ignore[attr-defined]
 
     config = Config(
         yandex_token=None,

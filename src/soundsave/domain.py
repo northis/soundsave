@@ -70,6 +70,28 @@ class Candidate:
         return ', '.join(self.artists)
 
 
+@dataclass
+class MetadataCandidate(Candidate):
+    """A track found in a metadata catalogue."""
+
+    album_artists: tuple[str, ...] = ()
+    year: int | None = None
+    release_date: str | None = None
+    genre: str | None = None
+    url: str | None = None
+    lyrics_available: bool = False
+
+
+@dataclass
+class MetadataMatch:
+    """Result of looking up one local file in a metadata catalogue."""
+
+    status: str
+    candidate: MetadataCandidate | None = None
+    score: float = 0.0
+    reason: str = ''
+
+
 class MatchStatus(str, Enum):
     """Outcome of matching a local track against catalogue candidates."""
 

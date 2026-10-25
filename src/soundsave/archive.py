@@ -19,10 +19,32 @@ logger = logging.getLogger(__name__)
 FILENAME_RE = re.compile(r'^(\d+)\.\s*(.+?)\s-\s*(.*?)\.(mp3|flac)$', re.IGNORECASE)
 AUDIO_EXTENSIONS = frozenset({'.mp3', '.flac'})
 _LOSSLESS_EXTENSIONS = frozenset({'.flac', '.wav', '.aiff', '.alac'})
+MAGIC_BYTES = (
+    ('image/jpeg', bytes((0xFF, 0xD8, 0xFF))),
+    ('image/png', bytes((0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))),
+)
 
 
 class ArchiveError(RuntimeError):
     """Raised when a file in the archive cannot be read."""
+
+
+def get_image_type(data: bytes) -> str:
+    """Return the MIME type of an image based on its magic bytes."""
+    for mime_type, magic_bytes in MAGIC_BYTES:
+        if data.startswith(magic_bytes):
+            return mime_type
+    return 'image/jpeg'
+
+
+def has_text(value: str | None) -> bool:
+    """Return whether *value* contains non-whitespace text."""
+    return bool(value and value.strip())
+
+
+def has_artists(artists: list[str]) -> bool:
+    """Return whether *artists* contains at least one non-empty name."""
+    return any(artist.strip() for artist in artists)
 
 
 @dataclass(frozen=True)
@@ -50,6 +72,7 @@ class TagData:
     lyrics: str | None = None
     cover: bytes | None = None
     cover_mime: str | None = None
+    cover_type: int | None = None
     url: str | None = None
 
 
@@ -88,6 +111,19 @@ def _first_tag(tags: object, key: str) -> str | None:
     return str(value)
 
 
+def _first_text(tags: object, key: str) -> str | None:
+    """Return the first non-empty value for *key*, or ``None``."""
+    value = tags.get(key) if hasattr(tags, 'get') else None
+    if value is None:
+        return None
+    values = value if isinstance(value, list | tuple) else [value]
+    for item in values:
+        text = str(item)
+        if text.strip():
+            return text
+    return None
+
+
 def _read_mp3_tags(path: Path) -> TagData:
     try:
         tags = ID3(path)
@@ -120,15 +156,23 @@ def _read_mp3_tags(path: Path) -> TagData:
     if comment_frames and comment_frames[0].text:
         data.comment = str(comment_frames[0].text[0])
     lyrics_frames = tags.getall('USLT')
-    if lyrics_frames:
-        data.lyrics = str(lyrics_frames[0].text)
+    for frame in lyrics_frames:
+        text = str(frame.text)
+        if text.strip():
+            data.lyrics = text
+            break
     picture_frames = tags.getall('APIC')
     if picture_frames:
-        data.cover = picture_frames[0].data
-        data.cover_mime = picture_frames[0].mime
+        picture = next((frame for frame in picture_frames if frame.type == 3), picture_frames[0])
+        data.cover = picture.data
+        data.cover_mime = picture.mime
+        data.cover_type = picture.type
     url_frames = tags.getall('WOAF')
-    if url_frames:
-        data.url = str(getattr(url_frames[0], 'url', '') or '')
+    for frame in url_frames:
+        url = str(getattr(frame, 'url', '') or '')
+        if url.strip():
+            data.url = url
+            break
     return data
 
 
@@ -144,14 +188,16 @@ def _read_flac_tags(path: Path) -> TagData:
         data.track_number = _first_tag(tags, 'tracknumber')
         data.genre = _first_tag(tags, 'genre')
         data.comment = _first_tag(tags, 'comment')
-        data.lyrics = _first_tag(tags, 'lyrics')
+        data.lyrics = _first_text(tags, 'lyrics')
+        data.url = _first_text(tags, 'url')
         artist = tags.get('artist')
         if artist:
             data.artists = [str(item) for item in artist]
     if audio.pictures:
-        picture = audio.pictures[0]
+        picture = next((item for item in audio.pictures if item.type == 3), audio.pictures[0])
         data.cover = picture.data
         data.cover_mime = picture.mime
+        data.cover_type = picture.type
     return data
 
 
@@ -272,7 +318,11 @@ def _write_mp3_tags(path: Path, data: TagData) -> None:
 
 def _write_flac_tags(path: Path, data: TagData) -> None:
     audio = FLAC(path)
-    tags = audio.tags if audio.tags is not None else {}
+    if audio.tags is None:
+        audio.add_tags()
+    tags = audio.tags
+    if tags is None:
+        raise ArchiveError(f'Could not create FLAC tags: {path}')
     tags.clear()
     if data.title:
         tags['title'] = [data.title]
@@ -292,17 +342,16 @@ def _write_flac_tags(path: Path, data: TagData) -> None:
         tags['comment'] = [data.comment]
     if data.lyrics:
         tags['lyrics'] = [data.lyrics]
-    audio.tags = tags
+    if data.url:
+        tags['url'] = [data.url]
     audio.clear_pictures()
     if data.cover:
-        audio.add_picture(
-            Picture(
-                type=3,
-                mime=data.cover_mime or 'image/jpeg',
-                desc='',
-                data=data.cover,
-            ),
-        )
+        picture = Picture()
+        picture.type = 3
+        picture.mime = data.cover_mime or 'image/jpeg'
+        picture.desc = ''
+        picture.data = data.cover
+        audio.add_picture(picture)
     audio.save()
 
 
@@ -341,3 +390,128 @@ def copy_tags(source: Path, destination: Path) -> None:
         _write_mp3_tags(destination, data)
     elif destination_suffix == '.flac':
         _write_flac_tags(destination, data)
+
+
+def _replace_mp3_frame(tags: ID3, frame_id: str, frame: object) -> None:
+    tags.delall(frame_id)
+    tags.add(frame)  # type: ignore[arg-type]
+
+
+def _update_mp3_tags(path: Path, data: TagData) -> bool:
+    existing = _read_mp3_tags(path)
+    try:
+        tags = ID3(path)
+    except ID3NoHeaderError:
+        tags = ID3()
+
+    changed = False
+    if data.title and not has_text(existing.title):
+        _replace_mp3_frame(tags, 'TIT2', TIT2(encoding=3, text=data.title))
+        changed = True
+    if data.artists and not has_artists(existing.artists):
+        _replace_mp3_frame(tags, 'TPE1', TPE1(encoding=3, text=data.artists))
+        changed = True
+    if data.album and not has_text(existing.album):
+        _replace_mp3_frame(tags, 'TALB', TALB(encoding=3, text=data.album))
+        changed = True
+    if data.album_artist and not has_text(existing.album_artist):
+        _replace_mp3_frame(tags, 'TPE2', TPE2(encoding=3, text=data.album_artist))
+        changed = True
+    if data.date and not has_text(existing.date):
+        _replace_mp3_frame(tags, 'TDRC', TDRC(encoding=3, text=data.date))
+        changed = True
+    if data.genre and not has_text(existing.genre):
+        _replace_mp3_frame(tags, 'TCON', TCON(encoding=3, text=data.genre))
+        changed = True
+    if data.lyrics and not has_text(existing.lyrics):
+        _replace_mp3_frame(tags, 'USLT', USLT(encoding=3, text=data.lyrics))
+        changed = True
+    if data.url and not has_text(existing.url):
+        _replace_mp3_frame(tags, 'WOAF', WOAF(url=data.url))
+        changed = True
+    if data.cover and (existing.cover is None or existing.cover_type != 3):
+        for key in list(tags.keys()):
+            if key.startswith('APIC:') and tags[key].type == 3:
+                del tags[key]
+        tags.add(
+            APIC(
+                encoding=3,
+                mime=data.cover_mime or 'image/jpeg',
+                type=3,
+                data=data.cover,
+            ),
+        )
+        changed = True
+
+    if not changed:
+        return False
+    tags.save(path)
+    return True
+
+
+def _update_flac_tags(path: Path, data: TagData) -> bool:
+    existing = _read_flac_tags(path)
+    audio = FLAC(path)
+    if audio.tags is None:
+        audio.add_tags()
+    tags = audio.tags
+    if tags is None:
+        raise ArchiveError(f'Could not create FLAC tags: {path}')
+
+    changed = False
+    if data.title and not has_text(existing.title):
+        tags['title'] = [data.title]
+        changed = True
+    if data.artists and not has_artists(existing.artists):
+        tags['artist'] = list(data.artists)
+        changed = True
+    if data.album and not has_text(existing.album):
+        tags['album'] = [data.album]
+        changed = True
+    if data.album_artist and not has_text(existing.album_artist):
+        tags['albumartist'] = [data.album_artist]
+        changed = True
+    if data.date and not has_text(existing.date):
+        tags['date'] = [data.date]
+        changed = True
+    if data.genre and not has_text(existing.genre):
+        tags['genre'] = [data.genre]
+        changed = True
+    if data.lyrics and not has_text(existing.lyrics):
+        tags['lyrics'] = [data.lyrics]
+        changed = True
+    if data.url and not has_text(existing.url):
+        tags['url'] = [data.url]
+        changed = True
+    if data.cover and (existing.cover is None or existing.cover_type != 3):
+        for picture in list(audio.pictures or []):
+            if picture.type == 3:
+                audio.remove_picture(picture)
+        picture = Picture()
+        picture.type = 3
+        picture.mime = data.cover_mime or 'image/jpeg'
+        picture.desc = ''
+        picture.data = data.cover
+        audio.add_picture(picture)
+        changed = True
+
+    if not changed:
+        return False
+    audio.save()
+    return True
+
+
+def update_tag_data(path: Path, data: TagData, *, cover_mode: str = 'missing') -> bool:
+    """Fill empty tags in *path* from *data*, preserving all other frames.
+
+    Only fields that are empty in the file are written; non-empty fields are
+    left untouched. The function returns whether the file was changed.
+    """
+    if cover_mode != 'missing':
+        raise ValueError(f'Unsupported cover mode: {cover_mode}')
+    suffix = path.suffix.lower()
+    if suffix == '.mp3':
+        return _update_mp3_tags(path, data)
+    if suffix == '.flac':
+        return _update_flac_tags(path, data)
+    raise ArchiveError(f'Unsupported audio format: {path.suffix}')

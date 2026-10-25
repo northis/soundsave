@@ -7,13 +7,18 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import requests
 from mutagen import File as MutagenFile
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
-from .domain import AudioQuality
+from .domain import AudioQuality, Candidate
+from .quality import TargetFormat
+
+if TYPE_CHECKING:
+    from .providers.base import MusicProvider
 
 logger = logging.getLogger(__name__)
 
@@ -137,3 +142,76 @@ def transcode_flac_to_mp3(source: Path, destination: Path, *, bitrate: int = 320
     except subprocess.CalledProcessError as exc:
         raise DownloadError(f'ffmpeg failed: {exc.stderr.strip()}') from exc
     return destination
+
+
+def download_best_stream(
+    provider: MusicProvider,
+    candidate: Candidate,
+    *,
+    target_format: TargetFormat,
+    temporary_dir: Path,
+    stem: str,
+    duration_tolerance: float,
+) -> tuple[Path, AudioQuality, str]:
+    """Download the best stream for *candidate* and return path, quality, extension."""
+    duration = candidate.duration_s
+
+    if target_format is TargetFormat.FLAC:
+        if not candidate.has_flac:
+            raise DownloadError('FLAC is not available for this candidate')
+        url = provider.get_stream_url(candidate, 'flac')
+        if not url:
+            raise DownloadError('The provider did not return a FLAC stream')
+        path = download_file(url, temporary_dir / f'{stem}.flac')
+        quality = verify_audio(
+            path,
+            expected_codec='flac',
+            expected_duration_s=duration,
+            duration_tolerance=duration_tolerance,
+        )
+        return path, quality, 'flac'
+
+    if target_format is TargetFormat.KEEP and candidate.has_flac:
+        url = provider.get_stream_url(candidate, 'flac')
+        if url:
+            path = download_file(url, temporary_dir / f'{stem}.flac')
+            quality = verify_audio(
+                path,
+                expected_codec='flac',
+                expected_duration_s=duration,
+                duration_tolerance=duration_tolerance,
+            )
+            return path, quality, 'flac'
+
+    url = provider.get_stream_url(candidate, 'high')
+    if url:
+        path = download_file(url, temporary_dir / f'{stem}.mp3')
+        quality = verify_audio(
+            path,
+            expected_codec='mp3',
+            expected_duration_s=duration,
+            duration_tolerance=duration_tolerance,
+        )
+        return path, quality, 'mp3'
+
+    if candidate.has_flac and has_ffmpeg():
+        url = provider.get_stream_url(candidate, 'flac')
+        if not url:
+            raise DownloadError('The provider did not return a 320 kbps MP3 or FLAC stream')
+        flac_path = download_file(url, temporary_dir / f'{stem}.flac')
+        mp3_path = temporary_dir / f'{stem}.mp3'
+        transcode_flac_to_mp3(flac_path, mp3_path)
+        flac_path.unlink(missing_ok=True)
+        quality = verify_audio(
+            mp3_path,
+            expected_codec='mp3',
+            expected_duration_s=duration,
+            duration_tolerance=duration_tolerance,
+        )
+        return mp3_path, quality, 'mp3'
+
+    if candidate.has_flac:
+        raise DownloadError(
+            'Only FLAC is available and ffmpeg is missing; install ffmpeg or use --format flac',
+        )
+    raise DownloadError('The provider did not return a 320 kbps MP3 or FLAC stream')

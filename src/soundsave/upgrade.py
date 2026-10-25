@@ -10,13 +10,7 @@ from pathlib import Path
 from .archive import copy_tags, scan_archive
 from .config import Config
 from .domain import AudioQuality, Candidate, LocalTrack, MatchResult, MatchStatus, TrackQuery
-from .downloader import (
-    DownloadError,
-    download_file,
-    has_ffmpeg,
-    transcode_flac_to_mp3,
-    verify_audio,
-)
+from .downloader import download_best_stream
 from .manifest import Manifest, ManifestRecord
 from .matching import rank_candidates
 from .providers.base import MusicProvider, ProviderError
@@ -111,79 +105,6 @@ def _record(
     )
 
 
-def _download_best(
-    provider: MusicProvider,
-    candidate: Candidate,
-    *,
-    target_format: TargetFormat,
-    temporary_dir: Path,
-    stem: str,
-    duration_tolerance: float,
-) -> tuple[Path, AudioQuality, str]:
-    """Download the best stream for *candidate* and return path, quality, extension."""
-    duration = candidate.duration_s
-
-    if target_format is TargetFormat.FLAC:
-        if not candidate.has_flac:
-            raise DownloadError('FLAC is not available for this candidate')
-        url = provider.get_stream_url(candidate, 'flac')
-        if not url:
-            raise DownloadError('The provider did not return a FLAC stream')
-        path = download_file(url, temporary_dir / f'{stem}.flac')
-        quality = verify_audio(
-            path,
-            expected_codec='flac',
-            expected_duration_s=duration,
-            duration_tolerance=duration_tolerance,
-        )
-        return path, quality, 'flac'
-
-    if target_format is TargetFormat.KEEP and candidate.has_flac:
-        url = provider.get_stream_url(candidate, 'flac')
-        if url:
-            path = download_file(url, temporary_dir / f'{stem}.flac')
-            quality = verify_audio(
-                path,
-                expected_codec='flac',
-                expected_duration_s=duration,
-                duration_tolerance=duration_tolerance,
-            )
-            return path, quality, 'flac'
-
-    url = provider.get_stream_url(candidate, 'high')
-    if url:
-        path = download_file(url, temporary_dir / f'{stem}.mp3')
-        quality = verify_audio(
-            path,
-            expected_codec='mp3',
-            expected_duration_s=duration,
-            duration_tolerance=duration_tolerance,
-        )
-        return path, quality, 'mp3'
-
-    if candidate.has_flac and has_ffmpeg():
-        url = provider.get_stream_url(candidate, 'flac')
-        if not url:
-            raise DownloadError('The provider did not return a 320 kbps MP3 or FLAC stream')
-        flac_path = download_file(url, temporary_dir / f'{stem}.flac')
-        mp3_path = temporary_dir / f'{stem}.mp3'
-        transcode_flac_to_mp3(flac_path, mp3_path)
-        flac_path.unlink(missing_ok=True)
-        quality = verify_audio(
-            mp3_path,
-            expected_codec='mp3',
-            expected_duration_s=duration,
-            duration_tolerance=duration_tolerance,
-        )
-        return mp3_path, quality, 'mp3'
-
-    if candidate.has_flac:
-        raise DownloadError(
-            'Only FLAC is available and ffmpeg is missing; install ffmpeg or use --format flac',
-        )
-    raise DownloadError('The provider did not return a 320 kbps MP3 or FLAC stream')
-
-
 def _apply_track(
     track: LocalTrack,
     candidate: Candidate,
@@ -195,7 +116,7 @@ def _apply_track(
     temporary_dir = workspace / 'tmp'
     temporary_dir.mkdir(parents=True, exist_ok=True)
     stem = f'{track.file_id if track.file_id is not None else "track"}'
-    temporary, quality, extension = _download_best(
+    temporary, quality, extension = download_best_stream(
         provider,
         candidate,
         target_format=options.target_format,

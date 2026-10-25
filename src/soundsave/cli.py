@@ -18,14 +18,16 @@ from .providers.base import ProviderError
 from .providers.zvuk import ZvukProvider
 from .quality import QualityPolicy, TargetFormat
 from .sync import run_sync
+from .tags import TagsOptions, run_tags
 from .upgrade import UpgradeOptions, run_upgrade
+from .yandex_catalog import YandexCatalog
 
 logger = logging.getLogger('soundsave')
 
 
 def _add_scan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--dir', dest='target_dir', type=Path, help='archive directory (overrides TARGET_DIR)')
-    parser.add_argument('--limit', type=int, help='maximum number of below-target tracks to process')
+    parser.add_argument('--limit', type=int, help='maximum number of tracks to process')
     parser.add_argument('--id', dest='file_id', type=int, help='only process the track with this numeric id')
     parser.add_argument('--min-score', type=float, help='minimum match score (default: 0.85)')
     parser.add_argument(
@@ -78,6 +80,12 @@ def build_parser() -> argparse.ArgumentParser:
         action='store_true',
         help='retry tracks that failed during a previous run',
     )
+
+    tags_parser = subparsers.add_parser('tags', help='check and fill missing tags, covers and lyrics')
+    _add_scan_arguments(tags_parser)
+    tags_parser.add_argument('--apply', action='store_true', help='write missing values into existing files')
+    tags_parser.add_argument('--no-search', action='store_true', help='do not search the Yandex catalogue')
+    tags_parser.add_argument('--no-lyrics', action='store_true', help='do not fetch or write lyrics')
     return parser
 
 
@@ -143,6 +151,27 @@ def _run_upgrade(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_tags(config: Config, args: argparse.Namespace) -> int:
+    if not config.yandex_token:
+        raise ConfigError('YANDEX_TOKEN (or API_KEY) is not set')
+    catalog = YandexCatalog.load(config.yandex_token, config.playlist_url)
+    options = TagsOptions(
+        apply=args.apply,
+        search=not args.no_search,
+        lyrics=not args.no_lyrics,
+        min_score=config.min_score,
+        duration_tolerance=config.duration_tolerance,
+        limit=args.limit,
+        file_id=args.file_id,
+        delay=config.delay,
+        report_csv=args.report_csv,
+        report_json=args.report_json,
+    )
+    rows = run_tags(config, catalog, options)
+    _print_summary(rows)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     parser = build_parser()
@@ -163,6 +192,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_audit(config, args)
         if args.command == 'upgrade':
             return _run_upgrade(config, args)
+        if args.command == 'tags':
+            return _run_tags(config, args)
     except (ConfigError, ProviderError, ArchiveError, DownloadError, ValueError) as exc:
         logger.error('%s', exc)
         return 1
