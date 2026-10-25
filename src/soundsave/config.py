@@ -62,6 +62,8 @@ class Config:
     min_score: float = 0.85
     duration_tolerance: float = 5.0
     delay: float = 1.0
+    discogs_token: str | None = None
+    discogs_delay: float = 2.0
 
     @classmethod
     def load(cls, env_file: str | Path | None = None) -> Config:
@@ -99,6 +101,12 @@ class Config:
             _env('SOUNDSAVE_DELAY'),
             default=1.0,
         )
+        discogs_delay = _parse_float(
+            'DISCOGS_DELAY',
+            _env('DISCOGS_DELAY'),
+            default=2.0,
+            minimum=1.0,
+        )
 
         return cls(
             yandex_token=_env('YANDEX_TOKEN', 'API_KEY'),
@@ -109,6 +117,8 @@ class Config:
             min_score=min_score,
             duration_tolerance=duration_tolerance,
             delay=delay,
+            discogs_token=_env('DISCOGS_TOKEN'),
+            discogs_delay=discogs_delay,
         )
 
     def require_yandex(self) -> tuple[str, str]:

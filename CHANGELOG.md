@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   with `--apply`, fills only missing tags, front cover art and lyrics. It never
   downloads audio, renames files or overwrites non-empty values; `TRCK`/`TPOS`
   remain local archive data.
+- `soundsave tags` now supports Discogs as a fallback metadata source and
+  `--source discogs` for a Discogs-only run. Discogs requests are throttled by
+  `DISCOGS_DELAY` and retried on HTTP 429; complete files are skipped unless
+  `--no-skip-complete` is given.
 
 ### Changed
 

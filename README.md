@@ -19,9 +19,10 @@ dependency, and the repository contains only the application code.
 * **`upgrade`** — does the same, and with `--apply` downloads a 320 kbps MP3
   (or FLAC) stream, verifies it, copies the original tags, backs up the old
   file and atomically replaces it.
-* **`tags`** — checks the archive against Yandex Music and, with `--apply`,
-  fills only missing tags, cover art and lyrics in the existing files. It never
-  downloads audio, never renames files and never overwrites non-empty values.
+* **`tags`** — checks the archive against Yandex Music (and, optionally,
+  Discogs) and, with `--apply`, fills only missing tags, cover art and lyrics in
+  the existing files. It never downloads audio, never renames files and never
+  overwrites non-empty values.
 
 Zvuk is used for **real 320 kbps MP3 and FLAC** streams because Yandex Music
 currently serves at most 192 kbps MP3. YouTube Music is not used: its ceiling
@@ -31,6 +32,8 @@ is 256 kbps AAC/Opus, so it cannot produce a true 320 kbps MP3.
 
 * Python 3.10+
 * A Yandex Music account and token for `sync` and `tags`
+* A Discogs account and personal access token for the `tags` Discogs fallback
+  (optional; without it Discogs is skipped)
 * A Zvuk account with a paid subscription and a token for the `sync` 320 kbps
   fallback and for `audit`/`upgrade`
 * `ffmpeg` only if you ask for `--format mp3` and a candidate has FLAC but no
@@ -66,6 +69,8 @@ All settings live in `.env` (or in the environment). See
 | `PLAYLIST_URL` | for `sync`; optional for `tags` | Playlist URL, e.g. `https://music.yandex.ru/users/USER/playlists/3` |
 | `TARGET_DIR` | yes | Archive directory |
 | `ZVUK_TOKEN` | for the `sync` fallback and `audit`/`upgrade` | Zvuk token from `https://zvuk.com/api/tiny/profile` |
+| `DISCOGS_TOKEN` | for the `tags` Discogs fallback | Discogs personal access token |
+| `DISCOGS_DELAY` | no | Minimum pause between Discogs requests in seconds (default 2.0) |
 | `MAX_DOWNLOADS` | no | New tracks per `sync` run (default 20) |
 | `SOUNDSAVE_MIN_SCORE` | no | Minimum match score, 0..1 (default 0.85) |
 | `SOUNDSAVE_DURATION_TOLERANCE` | no | Duration tolerance in seconds (default 5) |
@@ -103,6 +108,12 @@ soundsave tags --limit 100 --csv tags.csv --json tags.json
 # Fill only missing values in the existing files
 soundsave tags --apply
 
+# Discogs only (e.g. after Yandex has already been applied)
+soundsave tags --source discogs --apply
+
+# Yandex only (disable the Discogs fallback)
+soundsave tags --source yandex --apply
+
 # Skip lyrics or catalogue search
 soundsave tags --apply --no-lyrics
 soundsave tags --no-search
@@ -130,19 +141,29 @@ stores FLAC where Zvuk has it. `--format keep` keeps the best source format
 
 `soundsave tags` matches each file against the configured Yandex Music
 playlist first, then searches the Yandex catalogue for files that are no longer
-in the playlist. It reports `missing` fields and `conflicts`; `--apply` fills
-only missing values:
+in the playlist. If both fail and `DISCOGS_TOKEN` is set, Discogs is tried as a
+fallback. It reports `missing` fields and `conflicts`; `--apply` fills only
+missing values:
 
-* title, artists, album, album artist, date, genre and `WOAF`;
+* title, artists, album, album artist, date, genre and `WOAF` (Yandex only);
 * front cover, only if the file has none;
 * lyrics, only if the file has none and Yandex reports text lyrics.
 
 `TRCK` and `TPOS` are local archive data and are never read from Yandex or
-changed. Existing values, including non-front cover pictures, are preserved.
-Writes are atomic: the file is copied to `.soundsave/tmp/`, retagged, verified
-with `mutagen` and then replaced.
+Discogs and never changed. Existing values, including non-front cover pictures,
+are preserved. Writes are atomic: the file is copied to `.soundsave/tmp/`,
+retagged, verified with `mutagen` and then replaced.
 
-`--no-search` skips the catalogue search and uses only the playlist;
+The default is `--source both`. Use `--source yandex` to disable the Discogs
+fallback, or `--source discogs` to query only Discogs (useful after the Yandex
+pass has already been applied). With `--source discogs`, files with no fields
+that Discogs can fill are skipped; `--no-skip-complete` forces a Discogs query
+for every file. Discogs requests are throttled by `DISCOGS_DELAY` (default 2
+seconds, i.e. 30 requests/minute against the 60/minute limit) and retried on
+HTTP 429 using `Retry-After`. Discogs does not provide lyrics and is not used
+for `WOAF`.
+
+`--no-search` skips catalogue search and uses only the Yandex playlist;
 `--no-lyrics` skips lyrics. Yandex text lyrics are not available for every
 track; those files are reported as `lyrics: unavailable`.
 
@@ -179,6 +200,9 @@ that word. If the two best candidates are within 0.05, the result is
 * `tags` depends on the Yandex Music catalogue. Tracks removed from Yandex or
   available only as live versions may be reported as `no_match`. Text lyrics
   are not available for every track.
+* Discogs is queried through its public API with a personal token and is
+  deliberately slow (`DISCOGS_DELAY`). Discogs images are subject to Discogs'
+  terms and the rights of their owners; use them for a personal archive only.
 * Downloading audio may violate the terms of service of Yandex Music or Zvuk.
   This tool is intended for a personal archive; you are responsible for how you
   use it.

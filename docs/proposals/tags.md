@@ -251,16 +251,20 @@ soundsave tags --id 42 --limit 100 --csv tags.csv --json tags.json
 |---|---|
 | `src/soundsave/tags.py` | оркестрация, diff, merge, `MetadataReportRow` |
 | `src/soundsave/yandex_catalog.py` | плейлист, batch tracks, search, cover, lyrics |
+| `src/soundsave/discogs_catalog.py` | Discogs client, throttle, search, release tracklist, cover |
+| `src/soundsave/catalogs.py` | `MetadataCatalog` protocol и `CompositeCatalog` |
 | `src/soundsave/domain.py` | `MetadataCandidate(Candidate)` с `album_artists`, `year`, `release_date`, `genre`, `url`, `lyrics_available` |
 | `src/soundsave/archive.py` | публичный `update_tag_data`, перенос `get_image_type` |
 | `src/soundsave/report.py` | обобщённые `write_csv`/`write_json` |
-| `src/soundsave/cli.py` | subparser `tags`, обработчик, `--apply`/`--no-search`/`--no-lyrics` |
+| `src/soundsave/config.py` | `DISCOGS_TOKEN`, `DISCOGS_DELAY` |
+| `src/soundsave/cli.py` | subparser `tags`, `--apply`/`--no-search`/`--no-lyrics`, `--source`, `--discogs-delay` |
 | `src/soundsave/sync.py` | импорт `full_title`/`parse_playlist_url`/`get_image_type` из `archive.py` и `yandex_catalog.py` |
 | `tests/test_tags.py` | матчинг, diff, политика «только пустые», запись |
 | `tests/test_yandex_catalog.py` | плейлист, batch, search, ошибки |
-| `tests/test_cli.py` | парсер и диспетчеризация `tags` |
+| `tests/test_discogs_catalog.py` | Discogs search/release/cover, throttle, `CompositeCatalog` |
+| `tests/test_cli.py` | парсер и диспетчеризация `tags`, выбор источников |
 | `tests/test_archive.py` | сохранение неизвестных кадров, MP3/FLAC, атомарность |
-| `README.md`, `CHANGELOG.md` | описание команды |
+| `README.md`, `CHANGELOG.md`, `.env.template` | описание команды и настройки |
 
 ## 11. Тестирование
 
@@ -290,8 +294,47 @@ soundsave tags --id 42 --limit 100 --csv tags.csv --json tags.json
 
 * исправление конфликтов (`--overwrite`);
 * реальные номера треков (`TRCK`/`TPOS`);
-* другие источники (MusicBrainz, AcoustID, Discogs, Deezer, iTunes);
+* другие источники (MusicBrainz, AcoustID, Deezer, iTunes);
 * SQLite-кэш результатов поиска (его роль выполняет `WOAF`).
 
 Следующие итерации могут добавить `--overwrite`, AcoustID для файлов с
-испорченными тегами и MusicBrainz/Cover Art Archive как второй источник.
+испорченными тегами и MusicBrainz/Cover Art Archive как ещё один источник.
+
+## 13. Discogs fallback (итерация 2)
+
+Discogs добавлен как дополнительный источник метаданных и обложек.
+
+* `DISCOGS_TOKEN` — personal access token; без него Discogs отключается.
+* `DISCOGS_DELAY=2.0` — минимум 2 секунды между запросами (30/мин при лимите
+  60/мин для авторизованных). На `429` используется `Retry-After`, до трёх
+  попыток.
+* `--source both` — поведение по умолчанию: Yandex первым, Discogs только если
+  Yandex вернул `no_match`/`ambiguous`/`error`.
+* `--source yandex` — только Yandex.
+* `--source discogs` — только Discogs; Yandex-плейлист не загружается. Удобно
+  после уже выполненного Yandex-прохода. Файлы, у которых нет полей, которые
+  Discogs может заполнить, по умолчанию пропускаются; `--no-skip-complete`
+  заставляет запрашивать Discogs для каждого файла.
+* `--no-search` отключает поиск у выбранных источников; с `--source discogs`
+  комбинация запрещена.
+* `--discogs-delay` переопределяет `DISCOGS_DELAY`.
+
+Матчинг Discogs:
+
+1. `GET /database/search` с `artist` + `track`, `type=release`, `per_page=5`.
+2. Дедупликация результатов по `title`/`year`, затем до трёх
+   `GET /releases/{id}`.
+3. Поиск трека в `tracklist` по названию и длительности через `matching.py`;
+   заголовки и индексы пропускаются.
+4. Заполняются `album`, `album_artist`, `date`, `genre` (сначала `styles[0]`,
+   затем `genres[0]`) и front cover (primary image).
+5. `lyrics` не заполняется: Discogs не отдаёт тексты.
+6. `WOAF` не заполняется: он остаётся точным кэшем Yandex-трека.
+
+`CompositeCatalog` вызывает Yandex первым и передаёт управление Discogs только
+при неуверенном результате. `MetadataReportRow` получает поле `source`
+(`yandex`/`discogs`), статус — `matched_discogs`.
+
+Скорость: один файл — один поиск и до трёх запросов релиза, примерно 8 секунд
+при `DISCOGS_DELAY=2`. Полный прогон по 444 файлам вне плейлиста занимает около
+часа; `--limit` позволяет обрабатывать частями.

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from mutagen.id3 import APIC, ID3, TALB, TIT2, TPE1, TRCK, USLT
+from mutagen.id3 import APIC, ID3, TALB, TCON, TDRC, TIT2, TPE1, TPE2, TRCK, USLT
 
 from soundsave.archive import TagData, read_tag_data
 from soundsave.config import Config
@@ -33,6 +33,9 @@ def write_tags(
     title: str = 'Saturnine',
     artist: str = 'The Gathering',
     album: str | None = None,
+    album_artist: str | None = None,
+    date: str | None = None,
+    genre: str | None = None,
     track_number: str | None = None,
     lyrics: str | None = None,
     cover: bytes | None = None,
@@ -42,6 +45,12 @@ def write_tags(
     tags.add(TPE1(encoding=3, text=[artist]))
     if album:
         tags.add(TALB(encoding=3, text=album))
+    if album_artist:
+        tags.add(TPE2(encoding=3, text=album_artist))
+    if date:
+        tags.add(TDRC(encoding=3, text=date))
+    if genre:
+        tags.add(TCON(encoding=3, text=genre))
     if track_number:
         tags.add(TRCK(encoding=3, text=track_number))
     if lyrics:
@@ -105,10 +114,10 @@ class FakeCatalog:
         self.find_calls += 1
         self.last_search = search
         self.last_url = url
-        if self.status != 'matched_playlist':
+        if self.status not in {'matched_playlist', 'matched_discogs'}:
             candidate = self.candidate if self.status == 'ambiguous' else None
             return MetadataMatch(status=self.status, candidate=candidate, score=0.5 if candidate else 0.0)
-        return MetadataMatch(status='matched_playlist', candidate=self.candidate, score=0.95)
+        return MetadataMatch(status=self.status, candidate=self.candidate, score=0.95)
 
     def has_cover(self, candidate: MetadataCandidate) -> bool:
         return self.cover is not None
@@ -196,6 +205,65 @@ class TestRunTags:
         assert catalog.cover_calls == 0
         assert catalog.lyrics_calls == 0
 
+    def test_skip_complete_does_not_query(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path)
+        write_tags(
+            path,
+            album='Mandylion',
+            album_artist='The Gathering',
+            date='1995-08-22',
+            genre='gothic metal',
+            lyrics='line',
+            cover=b'cover',
+        )
+        catalog = FakeCatalog(make_candidate())
+
+        rows = run_tags(make_config(tmp_path), catalog, make_options(skip_complete=True))
+
+        assert rows[0].status == 'ok'
+        assert rows[0].applied is False
+        assert rows[0].cover == 'present'
+        assert rows[0].lyrics == 'present'
+        assert catalog.find_calls == 0
+
+    def test_skip_complete_ignores_missing_lyrics(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path)
+        write_tags(
+            path,
+            album='Mandylion',
+            album_artist='The Gathering',
+            date='1995-08-22',
+            genre='gothic metal',
+            cover=b'cover',
+        )
+        catalog = FakeCatalog(make_candidate(lyrics_available=True))
+
+        rows = run_tags(make_config(tmp_path), catalog, make_options(skip_complete=True))
+
+        assert rows[0].status == 'ok'
+        assert rows[0].lyrics == 'missing'
+        assert catalog.find_calls == 0
+
+    def test_skip_complete_queries_when_gap(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path)
+        write_tags(
+            path,
+            album='Mandylion',
+            album_artist='The Gathering',
+            date='1995-08-22',
+            lyrics='line',
+            cover=b'cover',
+        )
+        catalog = FakeCatalog(make_candidate())
+
+        rows = run_tags(make_config(tmp_path), catalog, make_options(skip_complete=True))
+
+        assert rows[0].status == 'matched_playlist'
+        assert catalog.find_calls == 1
+
     def test_apply_fills_empty_tags(self, tmp_path: Path) -> None:
         path = tmp_path / '0001. The Gathering - Saturnine.mp3'
         make_mp3(path)
@@ -212,6 +280,35 @@ class TestRunTags:
         assert data.date == '1995-08-22'
         assert data.genre == 'gothic metal'
         assert data.url == 'https://music.yandex.ru/album/10/track/123'
+
+    def test_matched_discogs_fills_fields(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.mp3'
+        make_mp3(path)
+        write_tags(path)
+        catalog = FakeCatalog(
+            make_candidate(
+                provider='discogs',
+                url=None,
+                lyrics_available=True,
+            ),
+            status='matched_discogs',
+            cover=(b'\xff\xd8\xffdiscogs-cover', 'image/jpeg'),
+            lyrics='discogs lyrics',
+        )
+
+        rows = run_tags(make_config(tmp_path), catalog, make_options(apply=True))
+
+        assert rows[0].status == 'matched_discogs'
+        assert rows[0].source == 'discogs'
+        assert rows[0].applied is True
+        assert rows[0].cover == 'added'
+        assert rows[0].lyrics == 'added'
+        data = read_tag_data(path)
+        assert data.album == 'Mandylion'
+        assert data.genre == 'gothic metal'
+        assert data.cover == b'\xff\xd8\xffdiscogs-cover'
+        assert data.lyrics == 'discogs lyrics'
+        assert data.url is None
 
     def test_apply_fills_only_missing(self, tmp_path: Path) -> None:
         path = tmp_path / '0001. The Gathering - Saturnine.mp3'

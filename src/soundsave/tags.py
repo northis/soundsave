@@ -24,15 +24,14 @@ from .archive import (
     scan_archive,
     update_tag_data,
 )
+from .catalogs import CONFIDENT_STATUSES, MetadataCatalog
 from .config import Config
 from .domain import LocalTrack, MetadataCandidate, MetadataMatch, TrackQuery
 from .matching import normalize
 from .report import write_csv, write_json
-from .yandex_catalog import YandexCatalog, parse_track_url
+from .yandex_catalog import parse_track_url
 
 logger = logging.getLogger(__name__)
-
-_CONFIDENT = frozenset({'matched_woaf', 'matched_playlist', 'matched_search'})
 
 
 @dataclass
@@ -42,6 +41,7 @@ class TagsOptions:
     apply: bool = False
     search: bool = True
     lyrics: bool = True
+    skip_complete: bool = False
     min_score: float = 0.85
     duration_tolerance: float = 5.0
     limit: int | None = None
@@ -62,6 +62,7 @@ class MetadataReportRow:
     album: str | None
     duration_s: float | None
     status: str
+    source: str | None = None
     source_id: str | None = None
     source_url: str | None = None
     confidence: float | None = None
@@ -190,7 +191,7 @@ def _conflicting_fields(tags: TagData, candidate: MetadataCandidate) -> list[str
     return conflicts
 
 
-def _cover_status(tags: TagData, candidate: MetadataCandidate, catalog: YandexCatalog) -> str:
+def _cover_status(tags: TagData, candidate: MetadataCandidate, catalog: MetadataCatalog) -> str:
     if tags.cover is not None and tags.cover_type == 3:
         return 'present'
     if not catalog.has_cover(candidate):
@@ -208,6 +209,41 @@ def _lyrics_status(tags: TagData, candidate: MetadataCandidate, *, lyrics_enable
     return 'unavailable'
 
 
+def _has_local_gaps(tags: TagData) -> bool:
+    """Return whether Discogs can fill at least one missing field.
+
+    ``WOAF`` is Yandex-only and Discogs has no lyrics, so neither is a gap for
+    a Discogs-only run.
+    """
+    if not has_text(tags.title):
+        return True
+    if not has_artists(tags.artists):
+        return True
+    if not has_text(tags.album):
+        return True
+    if not has_text(tags.album_artist):
+        return True
+    if not has_text(tags.date):
+        return True
+    if not has_text(tags.genre):
+        return True
+    return tags.cover is None or tags.cover_type != 3
+
+
+def _complete_row(track: LocalTrack, tags: TagData, options: TagsOptions) -> MetadataReportRow:
+    return MetadataReportRow(
+        path=str(track.path),
+        file_id=track.file_id,
+        artist=track.artist,
+        title=track.title,
+        album=track.album,
+        duration_s=track.duration_s,
+        status='ok',
+        cover='present' if tags.cover is not None and tags.cover_type == 3 else 'missing',
+        lyrics='present' if has_text(tags.lyrics) else ('skipped' if not options.lyrics else 'missing'),
+    )
+
+
 def _row(track: LocalTrack, match: MetadataMatch) -> MetadataReportRow:
     candidate = match.candidate
     confidence = match.score
@@ -221,6 +257,7 @@ def _row(track: LocalTrack, match: MetadataMatch) -> MetadataReportRow:
         album=track.album,
         duration_s=track.duration_s,
         status=match.status,
+        source=candidate.provider if candidate is not None else None,
         source_id=candidate.provider_id if candidate is not None else None,
         source_url=candidate.url if candidate is not None else None,
         confidence=round(confidence, 4) if confidence else None,
@@ -294,11 +331,13 @@ def _sleep(options: TagsOptions) -> None:
 
 def _process_track(
     track: LocalTrack,
-    catalog: YandexCatalog,
+    catalog: MetadataCatalog,
     options: TagsOptions,
     workspace: Path,
 ) -> tuple[MetadataReportRow, bool]:
     tags = read_tag_data(track.path)
+    if options.skip_complete and not _has_local_gaps(tags):
+        return _complete_row(track, tags, options), False
     match = catalog.find(
         _queries(track),
         url=tags.url,
@@ -308,7 +347,7 @@ def _process_track(
     )
     row = _row(track, match)
 
-    if match.status not in _CONFIDENT or match.candidate is None:
+    if match.status not in CONFIDENT_STATUSES or match.candidate is None:
         if options.search and match.status not in {'matched_woaf', 'matched_playlist'}:
             _sleep(options)
         return row, False
@@ -376,7 +415,7 @@ def _process_track(
     return row, True
 
 
-def run_tags(config: Config, catalog: YandexCatalog, options: TagsOptions) -> list[MetadataReportRow]:
+def run_tags(config: Config, catalog: MetadataCatalog, options: TagsOptions) -> list[MetadataReportRow]:
     """Check the archive and fill missing values from *catalog*."""
     workspace = config.target_dir / '.soundsave'
     tracks = scan_archive(config.target_dir, file_id=options.file_id)

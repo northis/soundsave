@@ -12,7 +12,9 @@ from pathlib import Path
 
 from . import __version__
 from .archive import ArchiveError
+from .catalogs import CompositeCatalog, MetadataCatalog
 from .config import Config, ConfigError
+from .discogs_catalog import DiscogsCatalog
 from .downloader import DownloadError
 from .providers.base import ProviderError
 from .providers.zvuk import ZvukProvider
@@ -84,8 +86,24 @@ def build_parser() -> argparse.ArgumentParser:
     tags_parser = subparsers.add_parser('tags', help='check and fill missing tags, covers and lyrics')
     _add_scan_arguments(tags_parser)
     tags_parser.add_argument('--apply', action='store_true', help='write missing values into existing files')
-    tags_parser.add_argument('--no-search', action='store_true', help='do not search the Yandex catalogue')
+    tags_parser.add_argument(
+        '--source',
+        choices=['yandex', 'discogs', 'both'],
+        default='both',
+        help='metadata sources (default: both)',
+    )
+    tags_parser.add_argument('--no-search', action='store_true', help='do not search the metadata catalogues')
     tags_parser.add_argument('--no-lyrics', action='store_true', help='do not fetch or write lyrics')
+    tags_parser.add_argument(
+        '--no-skip-complete',
+        action='store_true',
+        help='with --source discogs, query even files that already have all fields',
+    )
+    tags_parser.add_argument(
+        '--discogs-delay',
+        type=float,
+        help='pause between Discogs requests in seconds (default: 2.0)',
+    )
     return parser
 
 
@@ -99,6 +117,8 @@ def _override_config(config: Config, args: argparse.Namespace) -> Config:
         overrides['duration_tolerance'] = args.duration_tolerance
     if getattr(args, 'delay', None) is not None:
         overrides['delay'] = args.delay
+    if getattr(args, 'discogs_delay', None) is not None:
+        overrides['discogs_delay'] = args.discogs_delay
     if overrides:
         return replace(config, **overrides)
     return config
@@ -151,14 +171,42 @@ def _run_upgrade(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_metadata_catalog(config: Config, args: argparse.Namespace) -> MetadataCatalog:
+    sources = {'yandex', 'discogs'} if args.source == 'both' else {args.source}
+    if args.no_search and sources == {'discogs'}:
+        raise ConfigError('--no-search cannot be used with --source discogs')
+    if 'discogs' in sources and config.discogs_delay < 1.0:
+        raise ConfigError('DISCOGS_DELAY must be at least 1.0 second')
+
+    catalogs: list[MetadataCatalog] = []
+    if 'yandex' in sources:
+        if not config.yandex_token:
+            raise ConfigError('YANDEX_TOKEN (or API_KEY) is not set')
+        catalogs.append(YandexCatalog.load(config.yandex_token, config.playlist_url))
+    if 'discogs' in sources:
+        if not config.discogs_token:
+            if sources == {'discogs'}:
+                raise ConfigError('DISCOGS_TOKEN is not set')
+            logger.warning('DISCOGS_TOKEN is not set; Discogs fallback is disabled')
+        else:
+            discogs = DiscogsCatalog(config.discogs_token, delay=config.discogs_delay)
+            discogs.verify()
+            catalogs.append(discogs)
+
+    if not catalogs:
+        raise ConfigError('No metadata sources are configured')
+    if len(catalogs) == 1:
+        return catalogs[0]
+    return CompositeCatalog(catalogs[0], catalogs[1])
+
+
 def _run_tags(config: Config, args: argparse.Namespace) -> int:
-    if not config.yandex_token:
-        raise ConfigError('YANDEX_TOKEN (or API_KEY) is not set')
-    catalog = YandexCatalog.load(config.yandex_token, config.playlist_url)
+    catalog = _build_metadata_catalog(config, args)
     options = TagsOptions(
         apply=args.apply,
         search=not args.no_search,
         lyrics=not args.no_lyrics,
+        skip_complete=args.source == 'discogs' and not args.no_skip_complete,
         min_score=config.min_score,
         duration_tolerance=config.duration_tolerance,
         limit=args.limit,
