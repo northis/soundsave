@@ -1,5 +1,5 @@
-import { Player } from './player.js?v=2.1.1';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.1';
+import { Player } from './player.js?v=2.1.2';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.2';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });

@@ -119,14 +119,14 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @app.get('/favicon.ico')
     def favicon() -> RedirectResponse:
-        return RedirectResponse('/static/favicon.svg')
+        return RedirectResponse('/static/favicon.svg?v=2.1.2')
 
     @app.get('/manifest.webmanifest')
     def manifest() -> FileResponse:
         return FileResponse(
             STATIC / 'manifest.webmanifest',
             media_type='application/manifest+json',
-            headers={'Cache-Control': 'public, max-age=3600'},
+            headers={'Cache-Control': 'no-cache'},
         )
 
     @app.get('/sw.js')

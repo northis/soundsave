@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-10-27
+
+### Changed
+
+- PWA icons, favicon, apple-touch icon and the manifest link now carry a
+  version query (`?v=2.1.2`), so a new release cannot keep serving the previous
+  icon from the service worker or browser cache.
+- The manifest is served with `Cache-Control: no-cache`; the favicon redirect
+  and service worker precache use the versioned URLs.
+- The service worker shell cache was bumped to `v4`.
+
 ## [2.1.1] - 2026-10-27
 
 ### Changed

@@ -155,6 +155,7 @@ def test_pwa_assets_are_served(root: Path) -> None:
         manifest = client.get('/manifest.webmanifest')
         assert manifest.status_code == 200
         assert manifest.headers['content-type'].startswith('application/manifest+json')
+        assert manifest.headers['cache-control'] == 'no-cache'
 
         worker = client.get('/sw.js')
         assert worker.status_code == 200
@@ -163,3 +164,7 @@ def test_pwa_assets_are_served(root: Path) -> None:
         icon = client.get('/static/icons/icon-192.png')
         assert icon.status_code == 200
         assert icon.headers['content-type'] == 'image/png'
+
+        favicon = client.get('/favicon.ico', follow_redirects=False)
+        assert favicon.status_code in {307, 308}
+        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.2')
