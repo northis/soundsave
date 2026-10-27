@@ -1,10 +1,16 @@
 /* Audio playback, repeat modes and Media Session integration. */
 
 export class Player {
-  constructor({ onTrackChange, onTime, onState, onError } = {}) {
+  constructor({ onTrackChange, onTime, onState, onError, resolveSource } = {}) {
     this.audio = new Audio();
-    this.audio.preload = 'metadata';
-    this.audio.crossOrigin = 'use-credentials';
+    this.audio.preload = 'auto';
+    this.audio.setAttribute('playsinline', '');
+    this.audio.setAttribute('aria-hidden', 'true');
+    this.audio.style.display = 'none';
+    // Keep the media element in the document: some Android Chromium builds
+    // handle background playback more reliably when it is not detached.
+    document.body.appendChild(this.audio);
+    this.resolveSource = resolveSource || ((track) => track.audio_url);
     this.queue = [];
     this.track = null;
     this.repeat = localStorage.getItem('soundsave:repeat') || 'off';
@@ -84,7 +90,7 @@ export class Player {
     this.startAt = Number(startAt) || 0;
     if (!same) {
       this.audio.pause();
-      this.audio.src = track.audio_url;
+      this.audio.src = this.resolveSource(track);
       this.audio.load();
     }
     this.onTrackChange(track);

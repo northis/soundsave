@@ -1,5 +1,5 @@
-import { Player } from './player.js?v=2.1.2';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.2';
+import { Player } from './player.js?v=2.1.3';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.3';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -22,6 +22,7 @@ const state = {
   syncHidden: false,
   installPrompt: null,
   lastPositionSave: 0,
+  wasPlayingBeforeHidden: false,
 };
 
 let player = null;
@@ -446,7 +447,7 @@ function setCover(container, track) {
 
 function updateCacheIndicator(button, track) {
   const status = cacheManager ? cacheManager.state(track) : { status: 'none' };
-  button.classList.remove('is-cached', 'is-caching');
+  button.classList.remove('is-cached', 'is-caching', 'is-error');
   button.disabled = !cacheManager || !cacheManager.available;
   if (status.status === 'cached') {
     button.classList.add('is-cached');
@@ -457,8 +458,9 @@ function updateCacheIndicator(button, track) {
     button.title = 'Загрузка в кэш';
     button.innerHTML = icon('download');
   } else if (status.status === 'error') {
-    button.title = 'Ошибка кэша, попробовать ещё раз';
-    button.innerHTML = icon('alert');
+    button.classList.add('is-error');
+    button.title = 'Не удалось сохранить в кэш — нажмите, чтобы повторить';
+    button.innerHTML = icon('refresh');
   } else {
     button.title = 'Скачать локально';
     button.innerHTML = icon('download');
@@ -633,11 +635,24 @@ function currentTrack() {
   return state.sorted.find((track) => track.id === state.currentId) || state.tracks.find((track) => track.id === state.currentId) || null;
 }
 
+function playbackSource(track) {
+  if (!track || !track.audio_url) return '';
+  if (cacheManager && cacheManager.isCached(track)) return track.audio_url;
+  // Do not route the live stream through the service worker: Android can
+  // freeze the worker with the page, and the audio then dies when its buffer
+  // runs out. Only cached files are served by the worker.
+  const separator = track.audio_url.includes('?') ? '&' : '?';
+  return `${track.audio_url}${separator}stream=1`;
+}
+
 function autoCache(track) {
   if (!cacheManager || !cacheManager.available) return;
+  if (document.visibilityState !== 'visible' || navigator.onLine === false) return;
   const status = cacheManager.state(track).status;
   if (status === 'cached' || status === 'caching') return;
-  cacheManager.download(track).catch((error) => toast(error.message, { error: true }));
+  cacheManager.download(track).catch((error) => {
+    if (!document.hidden) toast(error.message, { error: true });
+  });
 }
 
 function downloadTrack(track) {
@@ -805,7 +820,18 @@ function setupEvents() {
   window.addEventListener('online', () => { toast('Соединение восстановлено'); updateSyncButton(); });
   window.addEventListener('offline', () => toast('Нет сети — доступны только скачанные треки', { error: true }));
   window.addEventListener('pagehide', savePosition);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) savePosition(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      state.wasPlayingBeforeHidden = Boolean(player && player.playing);
+      savePosition();
+      if (cacheManager) cacheManager.cancelActive();
+      return;
+    }
+    if (state.wasPlayingBeforeHidden && player && player.audio.paused) {
+      player.play();
+    }
+    state.wasPlayingBeforeHidden = false;
+  });
 }
 
 function savePosition() {
@@ -985,6 +1011,7 @@ async function init() {
     onTime,
     onState: onPlayerState,
     onError: (message) => toast(message, { error: true }),
+    resolveSource: playbackSource,
   });
   cacheManager = new CacheManager({
     onChange: onCacheChange,

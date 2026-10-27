@@ -75,6 +75,7 @@ export class CacheManager {
     this.onProgress = onProgress || (() => {});
     this.entries = new Map();
     this.active = null;
+    this.activeWasHidden = false;
     this.autoCache = localStorage.getItem('soundsave:autoCache') !== '0';
     this.limitBytes = Number(localStorage.getItem('soundsave:cacheLimitMb') || 2048) * 1024 * 1024;
   }
@@ -84,6 +85,14 @@ export class CacheManager {
     try {
       const stored = await idbAll();
       this.entries = new Map(stored.map((entry) => [entry.url, entry]));
+      const cache = await caches.open(AUDIO_CACHE);
+      for (const [url, entry] of [...this.entries]) {
+        if (entry.status === 'error' || entry.status === 'caching') {
+          this.entries.delete(url);
+          await idbDelete(url);
+          await cache.delete(new Request(url));
+        }
+      }
       await this._reconcile();
     } catch (error) {
       console.warn('Cache index is unavailable', error);
@@ -105,6 +114,12 @@ export class CacheManager {
   setAuto(value) {
     this.autoCache = Boolean(value);
     localStorage.setItem('soundsave:autoCache', this.autoCache ? '1' : '0');
+  }
+
+  cancelActive() {
+    if (!this.active) return;
+    this.activeWasHidden = true;
+    this.active.abort();
   }
 
   setLimitMb(value) {
@@ -129,10 +144,12 @@ export class CacheManager {
 
   async download(track) {
     if (!this.available || !track || !track.audio_url) return false;
+    if (document.visibilityState !== 'visible' || navigator.onLine === false) return false;
     if (this.isCached(track)) return true;
     if (this.active) this.active.abort();
     const controller = new AbortController();
     this.active = controller;
+    this.activeWasHidden = false;
     const url = track.audio_url;
     const separator = url.includes('?') ? '&' : '?';
     this.entries.set(url, { url, status: 'caching', progress: 0, size: 0, lastUsed: Date.now() });
@@ -185,8 +202,10 @@ export class CacheManager {
       this._notify();
       return true;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      const cancelled = error.name === 'AbortError' || this.activeWasHidden || document.visibilityState === 'hidden';
+      if (cancelled) {
         this.entries.delete(url);
+        try { await idbDelete(url); } catch (deleteError) { console.warn(deleteError); }
         this._notify();
         return false;
       }
@@ -194,7 +213,10 @@ export class CacheManager {
       this._notify();
       throw error;
     } finally {
-      if (this.active === controller) this.active = null;
+      if (this.active === controller) {
+        this.active = null;
+        this.activeWasHidden = false;
+      }
     }
   }
 

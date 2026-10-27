@@ -1,6 +1,6 @@
 /* Soundsave service worker: app shell, API fallback, covers and audio cache. */
 
-const SHELL_CACHE = 'soundsave-shell-v4';
+const SHELL_CACHE = 'soundsave-shell-v5';
 const AUDIO_CACHE = 'soundsave-audio-v1';
 const COVER_CACHE = 'soundsave-covers-v1';
 const API_CACHE = 'soundsave-api-v1';
@@ -8,16 +8,16 @@ const KEEP = new Set([SHELL_CACHE, AUDIO_CACHE, COVER_CACHE, API_CACHE]);
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=2.1.2',
-  '/static/app.js?v=2.1.2',
-  '/static/player.js?v=2.1.2',
-  '/static/cache.js?v=2.1.2',
-  '/static/favicon.svg?v=2.1.2',
-  '/static/icons/icon-192.png?v=2.1.2',
-  '/static/icons/icon-512.png?v=2.1.2',
-  '/static/icons/maskable-512.png?v=2.1.2',
-  '/static/icons/apple-touch-icon-180.png?v=2.1.2',
-  '/manifest.webmanifest?v=2.1.2',
+  '/static/style.css?v=2.1.3',
+  '/static/app.js?v=2.1.3',
+  '/static/player.js?v=2.1.3',
+  '/static/cache.js?v=2.1.3',
+  '/static/favicon.svg?v=2.1.3',
+  '/static/icons/icon-192.png?v=2.1.3',
+  '/static/icons/icon-512.png?v=2.1.3',
+  '/static/icons/maskable-512.png?v=2.1.3',
+  '/static/icons/apple-touch-icon-180.png?v=2.1.3',
+  '/manifest.webmanifest?v=2.1.3',
 ];
 
 self.addEventListener('install', (event) => {
@@ -166,6 +166,10 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) {
     if (url.pathname.endsWith('/audio')) {
       if (url.searchParams.get('download') === '1') return;
+      // Live playback must go straight to the network. A service worker can be
+      // frozen together with the page on Android, which cuts the stream when
+      // the buffer runs out. Cached tracks keep using the worker.
+      if (url.searchParams.get('stream') === '1') return;
       event.respondWith(audioResponse(request));
       return;
     }
@@ -185,7 +189,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname === '/manifest.webmanifest?v=2.1.2' || url.pathname.startsWith('/static/')) {
+  if (url.pathname === '/manifest.webmanifest?v=2.1.3' || url.pathname.startsWith('/static/')) {
     event.respondWith(cacheFirst(request));
   }
 });

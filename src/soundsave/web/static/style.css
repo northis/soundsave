@@ -231,6 +231,7 @@ button { cursor: pointer; }
 .cache-indicator:hover { background: var(--accent-soft); color: var(--accent); }
 .cache-indicator.is-cached { color: var(--accent); }
 .cache-indicator.is-caching { color: var(--accent); opacity: .75; }
+.cache-indicator.is-error { color: var(--danger); }
 .cache-indicator .icon { width: 14px; height: 14px; }
 .cache-indicator.is-caching .icon { animation: spin 1.4s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -276,6 +277,7 @@ button { cursor: pointer; }
 }
 .cache-btn.is-cached { color: var(--accent); }
 .cache-btn.is-caching { color: var(--accent); opacity: .75; }
+.cache-btn.is-error { color: var(--danger); }
 .cache-btn.is-caching .icon { animation: spin 1.4s linear infinite; }
 .player-controls { display: flex; align-items: center; gap: 4px; }
 .play-btn {

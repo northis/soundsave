@@ -119,7 +119,7 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @app.get('/favicon.ico')
     def favicon() -> RedirectResponse:
-        return RedirectResponse('/static/favicon.svg?v=2.1.2')
+        return RedirectResponse('/static/favicon.svg?v=2.1.3')
 
     @app.get('/manifest.webmanifest')
     def manifest() -> FileResponse:

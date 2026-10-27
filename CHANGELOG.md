@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-10-28
+
+### Fixed
+
+- Android/PWA playback no longer goes through the service worker for uncached
+  tracks. The worker could be frozen with the page while the screen was off,
+  cutting the stream after the buffered part ran out. Live playback now goes
+  directly to the network; only cached tracks use the worker.
+- The audio element is attached to the document, uses `preload="auto"` and no
+  longer sets `crossOrigin`; this improves background buffering and Media
+  Session behaviour.
+- Automatic cache downloads are cancelled when the page is hidden, so locking
+  the screen no longer leaves a failed cache download and a stale error marker.
+  Stale cache errors are cleaned on startup.
+- A failed cache download now shows a retry/refresh icon instead of an
+  exclamation mark; the latter was easy to mistake for a playback error.
+- If playback was active when the app was hidden, it is resumed when the app
+  becomes visible again.
+
 ## [2.1.2] - 2026-10-27
 
 ### Changed
