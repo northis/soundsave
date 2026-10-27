@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,25 @@ def test_web_parser_has_serve_and_scan() -> None:
 
     scan = build_parser().parse_args(['scan'])
     assert scan.command == 'scan'
+
+    snapshot = build_parser().parse_args(['snapshot', '--label', 'pre-update', '--keep', '4'])
+    assert snapshot.command == 'snapshot'
+    assert snapshot.label == 'pre-update'
+    assert snapshot.keep == 4
+
+
+def test_snapshot_copies_the_web_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = make_config(tmp_path)
+    monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+    database = tmp_path / '.soundsave' / 'library.sqlite3'
+    database.parent.mkdir(parents=True)
+    with sqlite3.connect(database) as connection:
+        connection.execute('CREATE TABLE marker (value TEXT)')
+
+    assert main(['snapshot', '--label', 'test']) == 0
+
+    snapshots = list((tmp_path / '.soundsave' / 'backups').glob('test-*.sqlite3'))
+    assert len(snapshots) == 1
 
 
 class TestTagsParser:

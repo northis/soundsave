@@ -57,3 +57,13 @@ def test_docker_files_mount_music_and_data() -> None:
     assert 'soundsave", "serve' in dockerfile
     assert 'EXPOSE 8765' in dockerfile
     assert 'ffmpeg' not in dockerfile
+    for name in ('SOUNDSAVE_COMMIT', 'SOUNDSAVE_COMMIT_DATE', 'SOUNDSAVE_VERSION', 'SOUNDSAVE_CREATED'):
+        assert f'ARG {name}=' in dockerfile
+        assert f'{name}: "${{{name}:-}}"' in compose
+    for label in (
+        'org.opencontainers.image.source',
+        'org.opencontainers.image.revision',
+        'org.opencontainers.image.version',
+        'org.opencontainers.image.created',
+    ):
+        assert label in dockerfile

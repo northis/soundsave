@@ -4,6 +4,11 @@ services:
   soundsave:
     build:
       context: .
+      args:
+        SOUNDSAVE_COMMIT: "${SOUNDSAVE_COMMIT:-}"
+        SOUNDSAVE_COMMIT_DATE: "${SOUNDSAVE_COMMIT_DATE:-}"
+        SOUNDSAVE_VERSION: "${SOUNDSAVE_VERSION:-}"
+        SOUNDSAVE_CREATED: "${SOUNDSAVE_CREATED:-}"
     image: soundsave:latest
     container_name: soundsave
     restart: unless-stopped

@@ -13,6 +13,21 @@ COPY src ./src
 RUN python -m pip install --upgrade pip \
     && python -m pip install ".[web]"
 
+# Build metadata: declared after the dependency layer so a new commit does not
+# invalidate the pip layer. deploy/windows/update.ps1 passes these as build args.
+ARG SOUNDSAVE_COMMIT=""
+ARG SOUNDSAVE_COMMIT_DATE=""
+ARG SOUNDSAVE_VERSION=""
+ARG SOUNDSAVE_CREATED=""
+ENV SOUNDSAVE_COMMIT=${SOUNDSAVE_COMMIT} \
+    SOUNDSAVE_COMMIT_DATE=${SOUNDSAVE_COMMIT_DATE} \
+    SOUNDSAVE_VERSION=${SOUNDSAVE_VERSION} \
+    SOUNDSAVE_CREATED=${SOUNDSAVE_CREATED}
+LABEL org.opencontainers.image.source="https://github.com/northis/soundsave" \
+      org.opencontainers.image.revision="${SOUNDSAVE_COMMIT}" \
+      org.opencontainers.image.version="${SOUNDSAVE_VERSION}" \
+      org.opencontainers.image.created="${SOUNDSAVE_CREATED}"
+
 RUN mkdir -p /music /app/data
 
 EXPOSE 8765

@@ -111,6 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument('--reload', action='store_true', help='reload on source changes (development)')
 
     subparsers.add_parser('scan', help='reconcile the web library database with the music folder')
+
+    snapshot_parser = subparsers.add_parser('snapshot', help='copy the web library database to DATA_DIR/backups')
+    snapshot_parser.add_argument('--label', default='manual', help='snapshot label (default: manual)')
+    snapshot_parser.add_argument('--keep', type=int, default=10, help='number of snapshots to keep (default: 10)')
     return parser
 
 
@@ -273,6 +277,44 @@ def _run_scan(config: Config) -> int:
     return 0
 
 
+def _run_snapshot(config: Config, args: argparse.Namespace) -> int:
+    import re
+    import sqlite3
+    from datetime import datetime, timezone
+
+    from .web.settings import WebSettings
+
+    if args.keep < 1:
+        raise ValueError('--keep must be >= 1')
+    settings = WebSettings.from_config(config)
+    settings.ensure()
+    database = settings.db_path
+    if not database.exists():
+        logger.info('No library database at %s; nothing to snapshot', database)
+        return 0
+    label = re.sub(r'[^A-Za-z0-9_-]+', '-', args.label).strip('-') or 'manual'
+    backup_dir = settings.data_dir / 'backups'
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    destination = backup_dir / f'{label}-{stamp}.sqlite3'
+    source = sqlite3.connect(database)
+    target = sqlite3.connect(destination)
+    try:
+        source.backup(target)
+    finally:
+        target.close()
+        source.close()
+    logger.info('Snapshot written to %s', destination)
+    snapshots = sorted(
+        backup_dir.glob(f'{label}-*.sqlite3'),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for old in snapshots[args.keep :]:
+        old.unlink(missing_ok=True)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     parser = build_parser()
@@ -299,6 +341,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_serve(config, args)
         if args.command == 'scan':
             return _run_scan(config)
+        if args.command == 'snapshot':
+            return _run_snapshot(config, args)
     except (ConfigError, ProviderError, ArchiveError, DownloadError, ValueError) as exc:
         logger.error('%s', exc)
         return 1

@@ -135,6 +135,9 @@ soundsave serve
 
 # Reconcile the web index with the music folder without starting the server
 soundsave scan
+
+# Copy the web library database to DATA_DIR/backups
+soundsave snapshot --label manual
 ```
 
 `soundsave sync` prefers a 320 kbps MP3 stream from Yandex Music. If Yandex
@@ -304,6 +307,24 @@ soundsave serve --reload
 
 The web extra adds FastAPI, Uvicorn and Pillow. The base CLI installation still
 works without them.
+
+### Updating on Windows
+
+The host-side updater fast-forwards the working copy, snapshots the database,
+builds the image from a clean worktree of the target commit, recreates the
+container and waits for `/api/version` to report the new commit. If the new
+container does not start, it restores `soundsave:previous`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\update.ps1
+powershell -ExecutionPolicy Bypass -File deploy\windows\update.ps1 -Rollback
+```
+
+Useful switches: `-Force` (rebuild even when the commit is already running),
+`-SkipSnapshot`, `-KeepImages 5`, `-Branch master`. The image is built with
+`SOUNDSAVE_COMMIT`/`SOUNDSAVE_VERSION` labels, so the version endpoint and the
+updater can identify the running revision. The working copy is never reset,
+cleaned or checked out.
 
 ## Development
 

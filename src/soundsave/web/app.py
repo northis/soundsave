@@ -14,8 +14,8 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .. import __version__
 from ..config import Config
+from .buildinfo import build_info
 from .covers import CoverCache
 from .db import LibraryStore, PlaylistRow, TrackRow
 from .library import LibraryError, LibraryScanner
@@ -145,7 +145,7 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @app.get('/api/version')
     def version() -> dict[str, str]:
-        return {'version': __version__}
+        return build_info()
 
     @app.get('/api/playlists')
     def playlists() -> JSONResponse:

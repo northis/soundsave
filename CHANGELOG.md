@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   on the seek bar, offline playback of cached tracks and Media Session support.
 - Dockerfile and docker-compose.yml with music/data bind mounts, plus
   `MUSIC_HOST_DIR`/`DATA_HOST_DIR` for host paths.
+- `soundsave snapshot` and `deploy/windows/update.ps1`: database snapshots,
+  clean-worktree image builds, commit/version labels, health waiting and
+  `soundsave:previous` rollback.
 - `soundsave tags` — checks the existing archive against Yandex Music and,
   with `--apply`, fills only missing tags, front cover art and lyrics. It never
   downloads audio, renames files or overwrites non-empty values; `TRCK`/`TPOS`

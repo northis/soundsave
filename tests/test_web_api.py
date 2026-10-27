@@ -135,6 +135,16 @@ def test_unknown_track_is_404(root: Path) -> None:
         assert response.status_code == 404
 
 
+def test_version_reports_build_metadata(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('SOUNDSAVE_COMMIT', 'abcdef123456')
+    monkeypatch.setenv('SOUNDSAVE_VERSION', '2.1.0-test')
+    with make_client(root) as client:
+        data = client.get('/api/version').json()
+
+    assert data['version'] == '2.1.0-test'
+    assert data['commit'] == 'abcdef123456'
+
+
 def test_pwa_assets_are_served(root: Path) -> None:
     with make_client(root) as client:
         index = client.get('/')
