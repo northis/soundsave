@@ -5,7 +5,10 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import logging
+import re
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from mutagen.id3 import APIC, TALB, TDRC, TIT2, TPE1, TPE2, TRCK, USLT, WOAF
@@ -13,7 +16,7 @@ from mutagen.id3._specs import ID3TimeStamp
 from mutagen.mp3 import MP3
 from yandex_music import Album, Client, DownloadInfo, Playlist, Track
 
-from .archive import FILENAME_RE, get_image_type, sanitize_component
+from .archive import get_image_type, sanitize_component
 from .config import Config, ConfigError
 from .domain import MatchStatus, TrackQuery
 from .downloader import download_best_stream
@@ -25,14 +28,52 @@ from .yandex_catalog import full_title, parse_playlist_url
 
 logger = logging.getLogger(__name__)
 
+# The archive scanner deliberately only handles MP3/FLAC, but sync must not
+# reuse an id that already belongs to a FLAC/AAC file in the main playlist.
+SYNC_FILENAME_RE = re.compile(
+    r'^(\d+)\.\s*(.+?)\s-\s*(.*?)\.(mp3|flac|m4a|aac|ogg|opus|wav|aiff|aif)$',
+    re.IGNORECASE,
+)
+SYNC_AUDIO_EXTENSIONS = frozenset({'.mp3', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wav', '.aiff', '.aif'})
+
+
+@dataclass
+class SyncProgress:
+    """Live progress reported by :func:`run_sync`."""
+
+    phase: str
+    total: int = 0
+    completed: int = 0
+    current_artist: str = ''
+    current_title: str = ''
+    added: int = 0
+    failed: int = 0
+    limit_reached: bool = False
+
+
+@dataclass
+class SyncResult:
+    """Outcome of one sync run."""
+
+    total_new: int = 0
+    added: int = 0
+    failed: int = 0
+    limit_reached: bool = False
+    dry_run: bool = False
+
+
+ProgressCallback = Callable[[SyncProgress], None]
+
 
 def get_highest_local_id(target_dir: Path) -> int:
     """Return the largest numeric id already present in *target_dir*."""
     if not target_dir.exists():
         return 0
     highest = 0
-    for file in target_dir.glob('*.mp3'):
-        match = FILENAME_RE.match(file.name)
+    for file in target_dir.iterdir():
+        if not file.is_file() or file.suffix.lower() not in SYNC_AUDIO_EXTENSIONS:
+            continue
+        match = SYNC_FILENAME_RE.match(file.name)
         if match is not None:
             with contextlib.suppress(ValueError):
                 highest = max(highest, int(match.group(1)))
@@ -251,8 +292,37 @@ def set_tags(path: Path, track: Track, track_id: int) -> None:
     tag.save()
 
 
-def run_sync(config: Config, *, dry_run: bool = False, limit: int | None = None) -> None:
-    """Download new playlist tracks into the archive."""
+def _report(callback: ProgressCallback | None, progress: SyncProgress) -> None:
+    """Deliver progress without letting a UI callback break the download."""
+    if callback is None:
+        return
+    try:
+        callback(progress)
+    except Exception:
+        logger.exception('Sync progress callback failed')
+
+
+def _track_labels(track: Track) -> tuple[str, str]:
+    artist = sanitize_component(track.artists[0].name if track.artists else '')
+    title = sanitize_component(track.title)
+    return artist, title
+
+
+def run_sync(
+    config: Config,
+    *,
+    dry_run: bool = False,
+    limit: int | None = None,
+    allow_zvuk: bool = True,
+    progress: ProgressCallback | None = None,
+) -> SyncResult:
+    """Download new playlist tracks into the archive.
+
+    The web player calls this with ``allow_zvuk=False``: it only stores the
+    stream Yandex Music offers (often 192 kbps MP3) and never asks Zvuk for a
+    320 kbps replacement. The CLI keeps the old fallback behaviour.
+    """
+    _report(progress, SyncProgress(phase='fetching'))
     token, playlist_url = config.require_yandex()
     owner, kind = parse_playlist_url(playlist_url)
 
@@ -260,19 +330,24 @@ def run_sync(config: Config, *, dry_run: bool = False, limit: int | None = None)
     playlist: Playlist = client.users_playlists(kind, owner)  # type: ignore[arg-type]
     playlist_tracks = playlist.tracks or []
     logger.info("Fetched playlist '%s' (%d tracks)", playlist.title, len(playlist_tracks))
+    _report(progress, SyncProgress(phase='scanning'))
 
     target_dir = config.target_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
     highest_id = get_highest_local_id(target_dir)
     logger.info('Highest local id: %d', highest_id)
 
     existing_identifiers = set()
-    for file in target_dir.glob('*.mp3'):
-        match = FILENAME_RE.match(file.name)
+    for file in target_dir.iterdir():
+        if not file.is_file() or file.suffix.lower() not in SYNC_AUDIO_EXTENSIONS:
+            continue
+        match = SYNC_FILENAME_RE.match(file.name)
         if match is not None:
             existing_identifiers.add(f'{match.group(2)}-{match.group(3)}'.lower())
 
     max_downloads = limit if limit is not None else config.max_downloads
     new_tracks: list[Track] = []
+    limit_reached = False
     for item in playlist_tracks:
         full = item.fetch_track()
         if full is None:
@@ -283,26 +358,50 @@ def run_sync(config: Config, *, dry_run: bool = False, limit: int | None = None)
             break
         new_tracks.append(full)
         if len(new_tracks) >= max_downloads:
+            limit_reached = True
             logger.info('Maximum number of tracks to download reached.')
             break
 
+    total_new = len(new_tracks)
     if not new_tracks:
         logger.info('No new tracks to download.')
-        return
+        result = SyncResult(dry_run=dry_run)
+        _report(progress, SyncProgress(phase='done'))
+        return result
 
-    logger.info('Will download %d new tracks', len(new_tracks))
+    logger.info('Will download %d new tracks', total_new)
     new_tracks.reverse()
 
     if dry_run:
         for track in new_tracks:
-            artist = sanitize_component(track.artists[0].name if track.artists else '')
-            title = sanitize_component(track.title)
+            artist, title = _track_labels(track)
             logger.info('[dry-run] would download: %s - %s', artist, title)
-        return
+        result = SyncResult(total_new=total_new, dry_run=True, limit_reached=limit_reached)
+        _report(progress, SyncProgress(phase='done', total=total_new, limit_reached=limit_reached))
+        return result
 
     next_id = highest_id + 1
-    provider = build_zvuk_provider(config)
+    provider = build_zvuk_provider(config) if allow_zvuk else None
+    if not allow_zvuk:
+        logger.info('Zvuk fallback is disabled for this run; keeping Yandex quality')
+    added = 0
+    failed = 0
+    completed = 0
     for track in new_tracks:
+        artist, title = _track_labels(track)
+        _report(
+            progress,
+            SyncProgress(
+                phase='downloading',
+                total=total_new,
+                completed=completed,
+                current_artist=artist,
+                current_title=title,
+                added=added,
+                failed=failed,
+                limit_reached=limit_reached,
+            ),
+        )
         temporary = download_track(
             track,
             target_dir,
@@ -311,26 +410,50 @@ def run_sync(config: Config, *, dry_run: bool = False, limit: int | None = None)
             duration_tolerance=config.duration_tolerance,
         )
         if temporary is None:
+            failed += 1
+            completed += 1
             continue
         try:
             set_tags(temporary, track, next_id)
-            artist = sanitize_component(track.artists[0].name if track.artists else '')
-            title = sanitize_component(track.title)
             final_path = target_dir / f'{next_id:04d}. {artist} - {title}.mp3'
             temporary.replace(final_path)
             logger.info('Saved %s', final_path.name)
         except Exception:
             logger.exception('Failed to tag or move track %s', track.id)
             temporary.unlink(missing_ok=True)
+            failed += 1
+            completed += 1
             continue
+        added += 1
+        completed += 1
         next_id += 1
         time.sleep(1)
 
     logger.info('Done. Collection now contains %d items.', next_id - 1)
+    result = SyncResult(
+        total_new=total_new,
+        added=added,
+        failed=failed,
+        limit_reached=limit_reached,
+    )
+    _report(
+        progress,
+        SyncProgress(
+            phase='done',
+            total=total_new,
+            completed=completed,
+            added=added,
+            failed=failed,
+            limit_reached=limit_reached,
+        ),
+    )
+    return result
 
 
 __all__ = [
     'ConfigError',
+    'SyncProgress',
+    'SyncResult',
     'build_track_identifier',
     'build_zvuk_provider',
     'build_zvuk_query',

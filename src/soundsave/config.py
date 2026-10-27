@@ -58,6 +58,11 @@ class Config:
     zvuk_token: str | None
     playlist_url: str | None
     target_dir: Path
+    music_dir: Path | None = None
+    main_playlist: str | None = None
+    data_dir: Path | None = None
+    web_host: str = '127.0.0.1'
+    web_port: int = 8765
     max_downloads: int = 20
     min_score: float = 0.85
     duration_tolerance: float = 5.0
@@ -73,11 +78,34 @@ class Config:
         else:
             load_dotenv()
 
+        music_raw = _env('MUSIC_DIR')
         target_raw = _env('TARGET_DIR')
-        if not target_raw:
-            raise ConfigError('TARGET_DIR is not set')
+        main_playlist = _env('MAIN_PLAYLIST')
+        if main_playlist and (Path(main_playlist).name != main_playlist or main_playlist in {'.', '..'}):
+            raise ConfigError(f'MAIN_PLAYLIST must be a single folder name, got {main_playlist!r}')
 
-        target_dir = Path(target_raw).expanduser()
+        music_dir = Path(music_raw).expanduser() if music_raw else None
+        if target_raw:
+            target_dir = Path(target_raw).expanduser()
+        elif music_dir is not None and main_playlist:
+            target_dir = music_dir / main_playlist
+        elif music_dir is not None:
+            target_dir = music_dir
+        else:
+            raise ConfigError('TARGET_DIR or MUSIC_DIR is not set')
+
+        if music_dir is None:
+            music_dir = target_dir
+        if music_raw and target_raw:
+            try:
+                target_dir.resolve().relative_to(music_dir.resolve())
+            except ValueError as exc:
+                raise ConfigError('TARGET_DIR must be inside MUSIC_DIR') from exc
+
+        data_raw = _env('DATA_DIR')
+        data_dir = Path(data_raw).expanduser() if data_raw else target_dir / '.soundsave'
+        web_port = _parse_int('SOUNDSAVE_PORT', _env('SOUNDSAVE_PORT'), default=8765)
+
         max_downloads = _parse_int(
             'MAX_DOWNLOADS',
             _env('MAX_DOWNLOADS', 'SOUNDSAVE_MAX_DOWNLOADS'),
@@ -113,6 +141,11 @@ class Config:
             zvuk_token=_env('ZVUK_TOKEN'),
             playlist_url=_env('PLAYLIST_URL'),
             target_dir=target_dir,
+            music_dir=music_dir,
+            main_playlist=main_playlist,
+            data_dir=data_dir,
+            web_host=_env('SOUNDSAVE_HOST', default='127.0.0.1') or '127.0.0.1',
+            web_port=web_port,
             max_downloads=max_downloads,
             min_score=min_score,
             duration_tolerance=duration_tolerance,

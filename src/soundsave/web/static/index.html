@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18181b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Soundsave</title>
+  <script>
+    (function () {
+      var stored = localStorage.getItem('soundsave:theme');
+      var dark = stored === 'dark' || (!stored || stored === 'system') &&
+        !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.dataset.themePreference = stored || 'system';
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = dark ? '#18181b' : '#f4f4f5';
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css?v=2.1.0">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png">
+</head>
+<body>
+<svg width="0" height="0" class="svg-sprite" aria-hidden="true">
+  <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="icon-prev" viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M18 6l-9 6 9 6z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="icon-next" viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M6 6l9 6-9 6z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="icon-repeat" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="icon-repeat-one" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><path d="M12 10v4M10.5 11.5h3"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="icon-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15 6L3 15"/><path d="M3 12a9 9 0 0 1 15-6l3 3"/><path d="M3 20v-5h5"/><path d="M21 4v5h-5"/></symbol>
+  <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"/></symbol>
+  <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V20h-2.5v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-2.5h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h2.5v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20v2.5h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15 9a4 4 0 0 1 0 6"/></symbol>
+  <symbol id="icon-mute" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="m16 9 5 6M21 9l-5 6"/></symbol>
+  <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="icon-note" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3z"/><path d="M12 9v5M12 17v.01"/></symbol>
+</svg>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">♪</span><span class="brand-name">Soundsave</span></div>
+    <label class="playlist-picker">
+      <span class="sr-only">Плейлист</span>
+      <select id="playlist-select"></select>
+    </label>
+    <button id="sync-btn" class="btn primary" type="button" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#icon-sync"></use></svg>
+      <span class="sync-label">Синхронизировать</span>
+    </button>
+    <button id="refresh-btn" class="icon-btn" type="button" title="Обновить библиотеку" aria-label="Обновить библиотеку">
+      <svg class="icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>
+    </button>
+    <div class="sort-control" id="sort-control" role="group" aria-label="Сортировка">
+      <button type="button" data-sort="number" class="active">#</button>
+      <button type="button" data-sort="title">Название</button>
+      <button type="button" data-sort="artist">Исполнитель</button>
+      <button type="button" id="sort-dir" class="sort-dir" title="Направление сортировки" aria-label="Направление сортировки">↑</button>
+    </div>
+    <div class="spacer"></div>
+    <button id="theme-btn" class="icon-btn" type="button" title="Тема" aria-label="Переключить тему">
+      <svg class="icon theme-icon-dark" aria-hidden="true"><use href="#icon-moon"></use></svg>
+      <svg class="icon theme-icon-light" aria-hidden="true"><use href="#icon-sun"></use></svg>
+    </button>
+    <button id="settings-btn" class="icon-btn" type="button" title="Настройки" aria-label="Настройки">
+      <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
+    </button>
+  </header>
+
+  <div id="sync-banner" class="sync-banner" hidden>
+    <span class="sync-dot" aria-hidden="true"></span>
+    <span id="sync-text">Синхронизация…</span>
+    <span class="sync-progress"><i id="sync-progress-fill"></i></span>
+    <button id="sync-hide" class="icon-btn small" type="button" title="Скрыть" aria-label="Скрыть">
+      <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+    </button>
+  </div>
+
+  <main class="main">
+    <div class="list-head" id="list-head" aria-hidden="true">
+      <span></span><span></span><span>Композиция</span><span class="album-col">Альбом</span><span>Формат</span><span>Битрейт</span><span>Частота</span><span>Время</span><span></span>
+    </div>
+    <div class="list-scroll" id="list-scroll">
+      <div class="list-canvas" id="list-canvas" role="listbox" aria-label="Треки"></div>
+      <div class="empty-state" id="empty-state" hidden>
+        <div class="empty-icon">♪</div>
+        <p id="empty-title">Библиотека пуста</p>
+        <p id="empty-text" class="muted">Добавьте папки-плейлисты в MUSIC_DIR.</p>
+      </div>
+    </div>
+    <button class="jump-current" id="jump-current" type="button" hidden>К текущему</button>
+  </main>
+
+  <footer class="player" id="player">
+    <div class="player-track">
+      <div class="player-cover" id="player-cover"></div>
+      <div class="player-info">
+        <div class="player-title" id="player-title">Выберите трек</div>
+        <div class="player-artist" id="player-artist"></div>
+      </div>
+      <button id="player-cache" class="cache-btn" type="button" title="Локальный кэш" aria-label="Локальный кэш" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#icon-download"></use></svg>
+      </button>
+    </div>
+    <div class="player-controls">
+      <button id="prev-btn" class="icon-btn" type="button" title="Предыдущий" aria-label="Предыдущий">
+        <svg class="icon" aria-hidden="true"><use href="#icon-prev"></use></svg>
+      </button>
+      <button id="play-btn" class="play-btn" type="button" title="Воспроизвести" aria-label="Воспроизвести">
+        <svg class="icon play-icon" aria-hidden="true"><use href="#icon-play"></use></svg>
+        <svg class="icon pause-icon" aria-hidden="true"><use href="#icon-pause"></use></svg>
+      </button>
+      <button id="next-btn" class="icon-btn" type="button" title="Следующий" aria-label="Следующий">
+        <svg class="icon" aria-hidden="true"><use href="#icon-next"></use></svg>
+      </button>
+      <button id="repeat-btn" class="icon-btn repeat-btn" type="button" title="Повтор" aria-label="Повтор">
+        <svg class="icon repeat-all-icon" aria-hidden="true"><use href="#icon-repeat"></use></svg>
+        <svg class="icon repeat-one-icon" aria-hidden="true"><use href="#icon-repeat-one"></use></svg>
+      </button>
+    </div>
+    <div class="seek-wrap">
+      <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Позиция воспроизведения" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="seek-cached" id="seek-cached"></span>
+        <span class="seek-played" id="seek-played"></span>
+        <span class="seek-thumb" id="seek-thumb"></span>
+      </div>
+      <div class="time"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+    </div>
+    <div class="player-extra" id="player-extra">
+      <button id="mute-btn" class="icon-btn" type="button" title="Звук" aria-label="Звук">
+        <svg class="icon volume-icon" aria-hidden="true"><use href="#icon-volume"></use></svg>
+        <svg class="icon mute-icon" aria-hidden="true"><use href="#icon-mute"></use></svg>
+      </button>
+      <div class="volume" id="volume" role="slider" tabindex="0" aria-label="Громкость" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <span id="volume-fill"></span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<dialog id="settings-dialog" class="settings-dialog">
+  <form method="dialog" class="settings-head">
+    <h2>Настройки</h2>
+    <button class="icon-btn" value="close" title="Закрыть" aria-label="Закрыть">
+      <svg class="icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+    </button>
+  </form>
+  <div class="settings-body">
+    <label class="field">
+      <span>Тема</span>
+      <select id="theme-select">
+        <option value="system">Системная</option>
+        <option value="light">Светлая</option>
+        <option value="dark">Тёмная</option>
+      </select>
+    </label>
+    <label class="field checkbox">
+      <input type="checkbox" id="auto-cache">
+      <span>Скачивать текущий трек в локальный кэш</span>
+    </label>
+    <label class="field">
+      <span>Лимит кэша</span>
+      <select id="cache-limit">
+        <option value="512">512 МБ</option>
+        <option value="1024">1 ГБ</option>
+        <option value="2048">2 ГБ</option>
+        <option value="4096">4 ГБ</option>
+        <option value="8192">8 ГБ</option>
+      </select>
+    </label>
+    <div class="cache-line"><span>Занято</span><span id="cache-usage">—</span></div>
+    <div class="settings-actions">
+      <button id="clear-cache" class="btn" type="button">Очистить кэш</button>
+      <button id="install-btn" class="btn primary" type="button" hidden>Установить приложение</button>
+    </div>
+    <div class="settings-foot">
+      <span>Soundsave</span>
+      <span id="version"></span>
+    </div>
+  </div>
+</dialog>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script type="module" src="/static/app.js?v=2.1.0"></script>
+</body>
+</html>

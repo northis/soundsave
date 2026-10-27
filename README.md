@@ -23,6 +23,9 @@ dependency, and the repository contains only the application code.
   Discogs) and, with `--apply`, fills only missing tags, cover art and lyrics in
   the existing files. It never downloads audio, never renames files and never
   overwrites non-empty values.
+* **`serve`** — a local web player and installable PWA for a folder of playlist
+  subfolders. It streams the original MP3/AAC/FLAC files with HTTP Range, keeps
+  a SQLite index, and can run the Yandex sync button for the one main playlist.
 
 Zvuk is used for **real 320 kbps MP3 and FLAC** streams because Yandex Music
 currently serves at most 192 kbps MP3. YouTube Music is not used: its ceiling
@@ -47,6 +50,8 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 
 pip install -e .
+# or, for the web player:
+pip install -e ".[web]"
 cp .env.template .env   # then edit .env
 ```
 
@@ -67,11 +72,18 @@ All settings live in `.env` (or in the environment). See
 |---|---|---|
 | `YANDEX_TOKEN` | for `sync` and `tags` | Yandex Music token (`API_KEY` is accepted as an alias) |
 | `PLAYLIST_URL` | for `sync`; optional for `tags` | Playlist URL, e.g. `https://music.yandex.ru/users/USER/playlists/3` |
-| `TARGET_DIR` | yes | Archive directory |
+| `TARGET_DIR` | yes, or use `MUSIC_DIR` | Archive directory; also the main playlist folder |
+| `MUSIC_DIR` | for the web player | Library root; every immediate subfolder is a playlist |
+| `MAIN_PLAYLIST` | with `MUSIC_DIR` | Folder name of the one playlist that gets the sync button |
+| `DATA_DIR` | no | SQLite index and cover cache (default `TARGET_DIR/.soundsave`) |
+| `MUSIC_HOST_DIR` | Docker only | Host path mounted at `/music` (Compose does not expand `~`) |
+| `DATA_HOST_DIR` | Docker only | Host path mounted at `/app/data` |
+| `SOUNDSAVE_HOST`, `SOUNDSAVE_PORT` | no | Web player bind address/port (default `127.0.0.1:8765`) |
+| `SOUNDSAVE_BIND_ADDR` | Docker only | Published interface (default `0.0.0.0`) |
 | `ZVUK_TOKEN` | for the `sync` fallback and `audit`/`upgrade` | Zvuk token from `https://zvuk.com/api/tiny/profile` |
 | `DISCOGS_TOKEN` | for the `tags` Discogs fallback | Discogs personal access token |
 | `DISCOGS_DELAY` | no | Minimum pause between Discogs requests in seconds (default 2.0) |
-| `MAX_DOWNLOADS` | no | New tracks per `sync` run (default 20) |
+| `MAX_DOWNLOADS` | no | New tracks per `sync` run or web sync button press (default 20) |
 | `SOUNDSAVE_MIN_SCORE` | no | Minimum match score, 0..1 (default 0.85) |
 | `SOUNDSAVE_DURATION_TOLERANCE` | no | Duration tolerance in seconds (default 5) |
 | `SOUNDSAVE_DELAY` | no | Pause between requests in seconds (default 1.0) |
@@ -117,6 +129,12 @@ soundsave tags --source yandex --apply
 # Skip lyrics or catalogue search
 soundsave tags --apply --no-lyrics
 soundsave tags --no-search
+
+# Run the web player (web extra required)
+soundsave serve
+
+# Reconcile the web index with the music folder without starting the server
+soundsave scan
 ```
 
 `soundsave sync` prefers a 320 kbps MP3 stream from Yandex Music. If Yandex
@@ -212,10 +230,85 @@ that word. If the two best candidates are within 0.05, the result is
 * `ffmpeg` is only needed for the FLAC → MP3 fallback. Zvuk normally provides a
   320 kbps MP3 stream directly, so the fallback is rare.
 
+## Web player and PWA
+
+The web player is a FastAPI application with vanilla HTML/CSS/JS, SQLite and a
+service worker. It reads a flat playlist layout:
+
+```text
+MUSIC_DIR/
+  Main/                 # main playlist, syncable
+    0001. Artist - Title.mp3
+  Chill/                # read-only
+    ...
+```
+
+Every immediate subfolder is a playlist; files inside are expected at the top
+level (nested directories are ignored). `TARGET_DIR`/`MAIN_PLAYLIST` selects the
+single syncable playlist. The SQLite index is reconciled with disk on container
+startup, after sync and when you press "Refresh".
+
+Docker quick start:
+
+```bash
+cp .env.template .env
+# edit MUSIC_DIR, MUSIC_HOST_DIR, MAIN_PLAYLIST, PLAYLIST_URL, YANDEX_TOKEN
+docker compose up -d --build
+# open http://localhost:8765 (or the HTTPS Cloudflare hostname for PWA install)
+```
+
+`MUSIC_HOST_DIR` and `DATA_HOST_DIR` are Compose-only host paths; the container
+uses `/music` and `/app/data`. Docker Compose does not expand `~`, so use an
+absolute path or a path relative to the repository.
+
+The sync button is shown only for the main playlist. It downloads new tracks
+from Yandex Music up to `MAX_DOWNLOADS` and **does not use Zvuk**: if Yandex
+serves 192 kbps, the archive gets 192 kbps. The CLI `soundsave sync` keeps its
+Zvuk fallback; the web image does not include `ffmpeg` and does not need
+`ZVUK_TOKEN`.
+
+The player:
+
+* streams files with HTTP Range, so seeking and fast starts work;
+* shows embedded covers (resized and cached) or a placeholder;
+* supports play/pause, previous/next, seek, repeat off/all/one and volume;
+* sorts by playlist number, title or artist and keeps the playing track in the
+  centre unless you have scrolled away;
+* uses a compact bottom panel on desktop and a two-row panel on mobile;
+* follows the device theme by default; system/light/dark is switchable.
+
+The PWA caches the app shell, API metadata and covers. Playing a track also
+downloads it into the local Cache API (progress is shown as a paler overlay on
+the seek bar), and cached tracks are marked with a check. The cache uses
+IndexedDB for its LRU index, defaults to 2 GB and can be cleared in Settings.
+This is client-side storage; the server keeps the original files.
+
+For installation on Android, Cloudflare Access must bypass the manifest and
+icons (and `/sw.js` if your proxy blocks it):
+
+```text
+/manifest.webmanifest
+/static/icons/*
+```
+
+Do not bypass `/api/*` or `/audio`; those remain behind Access. PWA installation
+requires HTTPS (or localhost); a plain `http://LAN-IP:8765` is not a secure
+context. iOS has stricter background-audio and storage limits.
+
+Local development:
+
+```bash
+pip install -e ".[dev,web]"
+soundsave serve --reload
+```
+
+The web extra adds FastAPI, Uvicorn and Pillow. The base CLI installation still
+works without them.
+
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,web]"
 pytest
 ruff check .
 ruff format --check .
@@ -223,7 +316,9 @@ ruff format --check .
 
 The package lives in `src/soundsave`. The design notes for the quality upgrade
 are in [`docs/proposals/bitrate-upgrade.md`](docs/proposals/bitrate-upgrade.md);
-the tag-checking design is in [`docs/proposals/tags.md`](docs/proposals/tags.md).
+the tag-checking design is in [`docs/proposals/tags.md`](docs/proposals/tags.md),
+and the web player/cache design is in
+[`docs/proposals/web-player.md`](docs/proposals/web-player.md).
 
 ## License
 

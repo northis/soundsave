@@ -28,6 +28,17 @@ def make_config(
     )
 
 
+def test_web_parser_has_serve_and_scan() -> None:
+    serve = build_parser().parse_args(['serve'])
+    assert serve.command == 'serve'
+    assert serve.host is None
+    assert serve.port is None
+    assert serve.reload is False
+
+    scan = build_parser().parse_args(['scan'])
+    assert scan.command == 'scan'
+
+
 class TestTagsParser:
     def test_defaults(self) -> None:
         args = build_parser().parse_args(['tags'])

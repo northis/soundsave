@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from mutagen import File as MutagenFile
+from mutagen.aac import AAC
+from mutagen.aiff import AIFF
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC, COMM, ID3, TALB, TCON, TDRC, TIT2, TPE1, TPE2, TRCK, USLT, WOAF, ID3NoHeaderError
 from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4, MP4Cover
+from mutagen.oggopus import OggOpus
+from mutagen.oggvorbis import OggVorbis
+from mutagen.wave import WAVE
 
 from .domain import AudioQuality, LocalTrack
 
@@ -73,6 +80,7 @@ class TagData:
     cover: bytes | None = None
     cover_mime: str | None = None
     cover_type: int | None = None
+    has_cover: bool = False
     url: str | None = None
 
 
@@ -124,7 +132,7 @@ def _first_text(tags: object, key: str) -> str | None:
     return None
 
 
-def _read_mp3_tags(path: Path) -> TagData:
+def _read_mp3_tags(path: Path, *, include_cover: bool = True) -> TagData:
     try:
         tags = ID3(path)
     except ID3NoHeaderError:
@@ -163,10 +171,12 @@ def _read_mp3_tags(path: Path) -> TagData:
             break
     picture_frames = tags.getall('APIC')
     if picture_frames:
-        picture = next((frame for frame in picture_frames if frame.type == 3), picture_frames[0])
-        data.cover = picture.data
-        data.cover_mime = picture.mime
-        data.cover_type = picture.type
+        data.has_cover = True
+        if include_cover:
+            picture = next((frame for frame in picture_frames if frame.type == 3), picture_frames[0])
+            data.cover = picture.data
+            data.cover_mime = picture.mime
+            data.cover_type = picture.type
     url_frames = tags.getall('WOAF')
     for frame in url_frames:
         url = str(getattr(frame, 'url', '') or '')
@@ -176,7 +186,7 @@ def _read_mp3_tags(path: Path) -> TagData:
     return data
 
 
-def _read_flac_tags(path: Path) -> TagData:
+def _read_flac_tags(path: Path, *, include_cover: bool = True) -> TagData:
     audio = FLAC(path)
     tags = audio.tags
     data = TagData()
@@ -194,21 +204,62 @@ def _read_flac_tags(path: Path) -> TagData:
         if artist:
             data.artists = [str(item) for item in artist]
     if audio.pictures:
-        picture = next((item for item in audio.pictures if item.type == 3), audio.pictures[0])
-        data.cover = picture.data
-        data.cover_mime = picture.mime
-        data.cover_type = picture.type
+        data.has_cover = True
+        if include_cover:
+            picture = next((item for item in audio.pictures if item.type == 3), audio.pictures[0])
+            data.cover = picture.data
+            data.cover_mime = picture.mime
+            data.cover_type = picture.type
     return data
 
 
-def read_tag_data(path: Path) -> TagData:
-    """Read a format-independent subset of tags from *path*."""
+def _read_mp4_tags(path: Path, *, include_cover: bool = True) -> TagData:
+    audio = MP4(path)
+    tags = audio.tags or {}
+    data = TagData()
+    data.title = _first_tag(tags, '\xa9nam') or ''
+    data.artists = [str(item) for item in tags.get('\xa9ART', []) if str(item).strip()]
+    data.album = _first_tag(tags, '\xa9alb')
+    data.album_artist = _first_tag(tags, 'aART')
+    data.date = _first_tag(tags, '\xa9day')
+    track = tags.get('trkn')
+    if track:
+        with contextlib.suppress(IndexError, TypeError):
+            data.track_number = str(track[0][0])
+    data.genre = _first_tag(tags, '\xa9gen')
+    data.comment = _first_tag(tags, '\xa9cmt')
+    data.lyrics = _first_text(tags, '\xa9lyr')
+    covers = tags.get('covr') or []
+    if covers:
+        data.has_cover = True
+        if include_cover:
+            cover = covers[0]
+            data.cover = bytes(cover)
+            data.cover_mime = 'image/png' if cover.imageformat == MP4Cover.FORMAT_PNG else 'image/jpeg'
+            data.cover_type = 3
+    return data
+
+
+def read_tag_data(path: Path, *, include_cover: bool = True) -> TagData:
+    """Read a format-independent subset of tags from *path*.
+
+    ``include_cover=False`` still reports whether a cover exists, but does not
+    keep its bytes in memory. The web library scanner uses this to avoid reading
+    megabytes of artwork for every track on startup.
+    """
     suffix = path.suffix.lower()
     if suffix == '.mp3':
-        return _read_mp3_tags(path)
+        return _read_mp3_tags(path, include_cover=include_cover)
     if suffix == '.flac':
-        return _read_flac_tags(path)
+        return _read_flac_tags(path, include_cover=include_cover)
+    if suffix in {'.m4a', '.mp4'}:
+        return _read_mp4_tags(path, include_cover=include_cover)
     return TagData()
+
+
+def _sample_rate(info: object) -> int | None:
+    value = getattr(info, 'sample_rate', None)
+    return int(value) if value else None
 
 
 def _read_audio_info(path: Path) -> tuple[AudioQuality, float | None]:
@@ -219,21 +270,35 @@ def _read_audio_info(path: Path) -> tuple[AudioQuality, float | None]:
     info = audio.info
     duration = float(info.length) if getattr(info, 'length', None) is not None else None
     suffix = path.suffix.lower()
+    bitrate = getattr(info, 'bitrate', None)
+    bitrate_kbps = round(bitrate / 1000) if bitrate else None
+    sample_rate = _sample_rate(info)
 
     if isinstance(audio, FLAC):
-        bitrate = getattr(info, 'bitrate', None)
-        return AudioQuality('flac', round(bitrate / 1000) if bitrate else None, lossless=True), duration
+        return AudioQuality('flac', bitrate_kbps, lossless=True, sample_rate_hz=sample_rate), duration
     if isinstance(audio, MP3):
-        bitrate = getattr(info, 'bitrate', None)
-        return AudioQuality('mp3', round(bitrate / 1000) if bitrate else None), duration
+        return AudioQuality('mp3', bitrate_kbps, sample_rate_hz=sample_rate), duration
+    if isinstance(audio, MP4):
+        codec = str(getattr(info, 'codec', '') or '').lower()
+        name = 'alac' if 'alac' in codec else 'aac'
+        return AudioQuality(name, bitrate_kbps, lossless=name == 'alac', sample_rate_hz=sample_rate), duration
+    if isinstance(audio, OggVorbis):
+        return AudioQuality('vorbis', bitrate_kbps, sample_rate_hz=sample_rate), duration
+    if isinstance(audio, OggOpus):
+        return AudioQuality('opus', bitrate_kbps, sample_rate_hz=sample_rate), duration
+    if isinstance(audio, AAC):
+        return AudioQuality('aac', bitrate_kbps, sample_rate_hz=sample_rate), duration
+    if isinstance(audio, (WAVE, AIFF)):
+        name = 'wav' if isinstance(audio, WAVE) else 'aiff'
+        return AudioQuality(name, bitrate_kbps, lossless=True, sample_rate_hz=sample_rate), duration
 
-    bitrate = getattr(info, 'bitrate', None)
     codec = suffix.lstrip('.') or 'unknown'
     return (
         AudioQuality(
             codec,
-            round(bitrate / 1000) if bitrate else None,
+            bitrate_kbps,
             lossless=suffix in _LOSSLESS_EXTENSIONS,
+            sample_rate_hz=sample_rate,
         ),
         duration,
     )

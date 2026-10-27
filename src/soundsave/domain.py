@@ -9,11 +9,12 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class AudioQuality:
-    """Codec and bitrate of an audio file."""
+    """Codec, bitrate and sample rate of an audio file."""
 
     codec: str
     bitrate_kbps: int | None = None
     lossless: bool = False
+    sample_rate_hz: int | None = None
 
     @property
     def label(self) -> str:

@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-27
+
 ### Added
 
+- `soundsave serve` — a FastAPI web player and installable PWA for a library of
+  flat playlist subfolders. It streams MP3/AAC/FLAC with HTTP Range, extracts
+  embedded covers, sorts by number/title/artist, and keeps the playing track in
+  view.
+- SQLite library index with startup reconciliation against the music folder,
+  incremental rescans after sync and a manual refresh endpoint.
+- A sync button for the main playlist only. The web sync downloads Yandex
+  streams up to `MAX_DOWNLOADS` and deliberately does not use the Zvuk 320 kbps
+  fallback.
+- Client-side PWA audio cache (Cache API + IndexedDB LRU index), cache progress
+  on the seek bar, offline playback of cached tracks and Media Session support.
+- Dockerfile and docker-compose.yml with music/data bind mounts, plus
+  `MUSIC_HOST_DIR`/`DATA_HOST_DIR` for host paths.
 - `soundsave tags` — checks the existing archive against Yandex Music and,
   with `--apply`, fills only missing tags, front cover art and lyrics. It never
   downloads audio, renames files or overwrites non-empty values; `TRCK`/`TPOS`
@@ -20,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `MUSIC_DIR`, `MAIN_PLAYLIST`, `DATA_DIR`, `SOUNDSAVE_HOST` and
+  `SOUNDSAVE_PORT` are available in configuration. `TARGET_DIR` remains
+  supported as the legacy flat-archive mode.
+- `AudioQuality` now carries the sample rate; MP4/M4A tags and covers are read
+  by the shared tag reader.
 - `soundsave sync` now prefers a genuine 320 kbps MP3 stream from Yandex
   Music and falls back to Zvuk when Yandex only offers a lower bitrate. If
   Zvuk has no confident match or cannot provide 320 kbps, the best Yandex

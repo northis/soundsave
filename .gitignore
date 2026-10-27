@@ -133,5 +133,11 @@ dmypy.json
 *.sqlite3-journal
 report.csv
 report.json
-
 audit.csv
+
+# Web player data and local music library
+data/
+music/
+
+# Local browser screenshots
+.openchamber/

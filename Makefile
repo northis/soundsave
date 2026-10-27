@@ -1,7 +1,7 @@
 .PHONY: install test lint format check
 
 install:
-	python -m pip install -e ".[dev]"
+	python -m pip install -e ".[dev,web]"
 
 test:
 	pytest

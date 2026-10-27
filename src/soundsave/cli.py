@@ -104,6 +104,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help='pause between Discogs requests in seconds (default: 2.0)',
     )
+
+    serve_parser = subparsers.add_parser('serve', help='run the web player and PWA')
+    serve_parser.add_argument('--host', help='bind address (overrides SOUNDSAVE_HOST)')
+    serve_parser.add_argument('--port', type=int, help='port (overrides SOUNDSAVE_PORT)')
+    serve_parser.add_argument('--reload', action='store_true', help='reload on source changes (development)')
+
+    subparsers.add_parser('scan', help='reconcile the web library database with the music folder')
     return parser
 
 
@@ -220,6 +227,52 @@ def _run_tags(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_serve(config: Config, args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+    except ImportError as exc:
+        raise ConfigError('Install the web dependencies with: pip install "soundsave[web]"') from exc
+
+    host = args.host or config.web_host
+    port = args.port or config.web_port
+    if args.reload:
+        uvicorn.run(
+            'soundsave.web.app:create_app_from_env',
+            factory=True,
+            host=host,
+            port=port,
+            reload=True,
+        )
+    else:
+        from .web.app import create_app
+
+        uvicorn.run(create_app(config), host=host, port=port)
+    return 0
+
+
+def _run_scan(config: Config) -> int:
+    from .web.db import LibraryStore
+    from .web.library import LibraryScanner
+    from .web.settings import WebSettings
+
+    settings = WebSettings.from_config(config)
+    settings.ensure()
+    store = LibraryStore(settings.db_path)
+    store.init()
+    report = LibraryScanner(settings, store).reconcile()
+    logger.info(
+        'Scanned %d playlists, %d tracks: +%d ~%d -%d =%d in %.2fs',
+        report.playlists,
+        report.tracks,
+        report.added,
+        report.updated,
+        report.removed,
+        report.unchanged,
+        report.elapsed_s,
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     parser = build_parser()
@@ -242,6 +295,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_upgrade(config, args)
         if args.command == 'tags':
             return _run_tags(config, args)
+        if args.command == 'serve':
+            return _run_serve(config, args)
+        if args.command == 'scan':
+            return _run_scan(config)
     except (ConfigError, ProviderError, ArchiveError, DownloadError, ValueError) as exc:
         logger.error('%s', exc)
         return 1
