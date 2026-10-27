@@ -18,7 +18,7 @@
       if (meta) meta.content = dark ? '#18181b' : '#f4f4f5';
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=2.1.0">
+  <link rel="stylesheet" href="/static/style.css?v=2.1.1">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png">
@@ -43,13 +43,14 @@
   <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
   <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="icon-note" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="icon-bass-clef" viewBox="0 0 1024 1024"><path d="M50 123Q216 231 288 301Q336 348 373.0 408.5Q410 469 431.5 536.0Q453 603 453 669Q453 728 435.0 773.5Q417 819 383.0 845.0Q349 871 302 871Q284 871 264.5 867.0Q245 863 224 855Q181 839 158.0 813.5Q135 788 135 765Q135 756 143.0 752.0Q151 748 158 748Q168 748 183 752Q190 754 196.5 755.0Q203 756 210 756Q248 756 272.0 733.5Q296 711 296 674Q296 638 266.0 612.0Q236 586 195 586Q146 586 111.0 617.0Q76 648 76 697Q76 756 109.0 802.0Q142 848 198.5 874.0Q255 900 324 900Q400 900 460.0 867.0Q520 834 555.5 776.5Q591 719 591 646Q591 551 538 464Q511 419 476.5 379.0Q442 339 389.0 297.5Q336 256 256.0 208.0Q176 160 57 101ZM687.0 809.0Q710 809 726.0 793.0Q742 777 742.0 754.0Q742 731 726.0 715.5Q710 700 687.0 700.0Q664 700 648.0 715.5Q632 731 632.0 754.0Q632 777 648.0 793.0Q664 809 687.0 809.0ZM687.0 589.0Q710 589 726.0 573.0Q742 557 742.0 534.0Q742 511 726.0 495.5Q710 480 687.0 480.0Q664 480 648.0 495.5Q632 511 632.0 534.0Q632 557 648.0 573.0Q664 589 687.0 589.0Z" transform="translate(204.716 123.627) scale(0.775970)" fill="currentColor"/></symbol>
   <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
   <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3z"/><path d="M12 9v5M12 17v.01"/></symbol>
 </svg>
 
 <div class="app-shell">
   <header class="topbar">
-    <div class="brand"><span class="brand-mark">♪</span><span class="brand-name">Soundsave</span></div>
+    <div class="brand"><span class="brand-mark"><svg class="brand-clef" aria-hidden="true"><use href="#icon-bass-clef"></use></svg></span><span class="brand-name">Soundsave</span></div>
     <label class="playlist-picker">
       <span class="sr-only">Плейлист</span>
       <select id="playlist-select"></select>
@@ -93,7 +94,7 @@
     <div class="list-scroll" id="list-scroll">
       <div class="list-canvas" id="list-canvas" role="listbox" aria-label="Треки"></div>
       <div class="empty-state" id="empty-state" hidden>
-        <div class="empty-icon">♪</div>
+        <div class="empty-icon" aria-hidden="true"><svg class="empty-clef"><use href="#icon-bass-clef"></use></svg></div>
         <p id="empty-title">Библиотека пуста</p>
         <p id="empty-text" class="muted">Добавьте папки-плейлисты в MUSIC_DIR.</p>
       </div>
@@ -191,6 +192,6 @@
 </dialog>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script type="module" src="/static/app.js?v=2.1.0"></script>
+<script type="module" src="/static/app.js?v=2.1.1"></script>
 </body>
 </html>

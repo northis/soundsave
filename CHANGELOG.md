@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-27
+
+### Changed
+
+- PWA icons and favicon now use a yellow bass clef on a purple gradient. The
+  in-app brand mark and empty state use the same clef.
+- The PWA manifest splash colors follow the purple icon background.
+- The service worker shell cache was bumped so installed apps pick up the new
+  icons.
+
 ## [2.1.0] - 2026-10-27
 
 ### Added

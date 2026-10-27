@@ -28,6 +28,19 @@ def test_committed_icons_exist() -> None:
         assert path.stat().st_size > 1000
 
 
+def test_icons_use_the_purple_and_yellow_palette() -> None:
+    manifest = json.loads((STATIC / 'manifest.webmanifest').read_text(encoding='utf-8'))
+    favicon = (STATIC / 'favicon.svg').read_text(encoding='utf-8')
+    index = (STATIC / 'index.html').read_text(encoding='utf-8')
+
+    assert manifest['background_color'] == '#2e1065'
+    assert manifest['theme_color'] == '#2e1065'
+    assert '#facc15' in favicon
+    assert '#2e1065' in favicon
+    assert 'icon-bass-clef' in index
+    assert 'brand-clef' in index
+
+
 def test_index_has_theme_boot_script_and_pwa_links() -> None:
     index = (STATIC / 'index.html').read_text(encoding='utf-8')
 
@@ -40,7 +53,7 @@ def test_index_has_theme_boot_script_and_pwa_links() -> None:
 def test_service_worker_caches_shell_and_audio() -> None:
     worker = (STATIC / 'sw.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v2' in worker
+    assert 'soundsave-shell-v3' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert 'parseRange' in worker

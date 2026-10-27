@@ -88,8 +88,9 @@ button { cursor: pointer; }
 .brand { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-weight: 700; letter-spacing: .01em; }
 .brand-mark {
   width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center;
-  background: var(--accent); color: #fff; font-size: 13px; line-height: 1;
+  background: linear-gradient(135deg, #2e1065, #7c3aed); color: #facc15; line-height: 1;
 }
+.brand-clef { width: 17px; height: 17px; fill: currentColor; }
 .brand-name { font-size: 13px; }
 .playlist-picker { min-width: 0; }
 .playlist-picker select {
@@ -180,7 +181,8 @@ button { cursor: pointer; }
   position: absolute; inset: 0; display: grid; place-content: center; justify-items: center;
   text-align: center; padding: 24px; pointer-events: none; color: var(--muted);
 }
-.empty-icon { font-size: 42px; opacity: .35; margin-bottom: 8px; }
+.empty-icon { opacity: .35; margin-bottom: 8px; color: var(--accent); }
+.empty-clef { width: 46px; height: 46px; fill: currentColor; }
 .empty-state p { margin: 2px 0; }
 .muted { color: var(--muted); }
 
