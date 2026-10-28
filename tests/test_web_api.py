@@ -184,4 +184,4 @@ def test_pwa_assets_are_served(root: Path) -> None:
 
         favicon = client.get('/favicon.ico', follow_redirects=False)
         assert favicon.status_code in {307, 308}
-        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.7')
+        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.8')

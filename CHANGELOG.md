@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.8] - 2026-10-29
+
+### Added
+
+- A cover preview for the current playing track: clicking its row dims the
+  list area and shows the artwork with the title and artist below. Clicks
+  outside the artwork or the text close it, and it follows the player to the
+  next track while open. Clicking any other row starts playback as before.
+
 ## [2.1.7] - 2026-10-28
 
 ### Added

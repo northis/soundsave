@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.1.7';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.7';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.1.7';
+import { Player } from './player.js?v=2.1.8';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.8';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.1.8';
 
-const APP_VERSION = '2.1.7';
+const APP_VERSION = '2.1.8';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -26,6 +26,7 @@ const state = {
   installPrompt: null,
   lastPositionSave: 0,
   wasPlayingBeforeHidden: false,
+  previewOpen: false,
 };
 
 let player = null;
@@ -210,6 +211,7 @@ async function selectPlaylist(playlistId, { initial = false, preserveCurrent = f
   const id = Number(playlistId);
   if (!id) return;
   if (!initial && id === state.playlistId) return;
+  closePreview();
   const previousId = state.playlistId;
   const previousTrack = state.currentId;
   const previousPosition = player ? player.currentTime : 0;
@@ -259,6 +261,7 @@ async function loadTracks(playlistId, { restore = false, preserveCurrent = false
       if (!track) clearCurrent();
     }
     if (!state.currentId) updatePlayerTrack(null);
+    if (!state.currentId) closePreview();
     renderList();
     if (state.currentId) centerCurrent(true);
     updateSyncButton();
@@ -419,15 +422,59 @@ function buildRow(track, index, height) {
   cacheCell.appendChild(cacheButton);
   row.appendChild(cacheCell);
 
-  row.addEventListener('click', () => player.playTrack(track.id));
+  row.addEventListener('click', () => activateTrack(track));
   row.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       event.stopPropagation();
-      player.playTrack(track.id);
+      activateTrack(track);
     }
   });
   return row;
+}
+
+function activateTrack(track) {
+  // The current playing track opens its cover instead of restarting; any other
+  // row starts playback as before.
+  diag('row:activate', { track: track.id, current: state.currentId, playing: player ? player.playing : '' });
+  if (track.id === state.currentId && player && player.playing) {
+    openPreview();
+    return;
+  }
+  player.playTrack(track.id);
+}
+
+// Cover preview: shown only for the current playing track. It keeps following
+// the player, so an auto-advanced track appears on it without closing.
+function openPreview() {
+  const track = currentTrack();
+  if (!track) return;
+  state.previewOpen = true;
+  renderPreview(track);
+  const overlay = $('cover-preview');
+  overlay.hidden = false;
+  overlay.focus({ preventScroll: true });
+}
+
+function closePreview() {
+  if (!state.previewOpen) return;
+  state.previewOpen = false;
+  $('cover-preview').hidden = true;
+}
+
+function renderPreview(track) {
+  if (!state.previewOpen) return;
+  if (!track) {
+    closePreview();
+    return;
+  }
+  const overlay = $('cover-preview');
+  const art = $('cover-preview-art');
+  setCover(art, track);
+  const hasCover = Boolean(track.has_cover && track.cover_url);
+  overlay.style.setProperty('--preview-art', hasCover ? `url("${track.cover_url}")` : 'none');
+  $('cover-preview-title').textContent = track.title || 'Без названия';
+  $('cover-preview-artist').textContent = track.artist || 'Неизвестный исполнитель';
 }
 
 function setCover(container, track) {
@@ -519,6 +566,7 @@ function clearCurrent() {
     player.setQueue(state.sorted);
   }
   updatePlayerTrack(null);
+  closePreview();
   renderVisible();
   updateUrl();
 }
@@ -601,6 +649,7 @@ function onTrackChange(track) {
     localStorage.setItem(`soundsave:current:${state.playlistId}`, String(track.id));
   }
   updatePlayerTrack(track);
+  renderPreview(track);
   renderVisible();
   centerCurrent();
   updateUrl();
@@ -819,6 +868,10 @@ function setupEvents() {
     centerCurrent(true);
     $('jump-current').hidden = true;
   });
+  $('cover-preview').addEventListener('click', (event) => {
+    if (event.target.closest('.cover-preview-art, .cover-preview-title, .cover-preview-artist')) return;
+    closePreview();
+  });
 
   $('list-scroll').addEventListener('scroll', () => {
     if (!state.programmaticScroll) state.userScrolled = true;
@@ -987,6 +1040,11 @@ function setupKeyboard() {
     const tag = event.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
     if (document.querySelector('dialog[open]')) return;
+    if (event.key === 'Escape' && state.previewOpen) {
+      event.preventDefault();
+      closePreview();
+      return;
+    }
     if (event.code === 'Space') {
       event.preventDefault();
       player.toggle();

@@ -18,10 +18,10 @@
       if (meta) meta.content = dark ? '#18181b' : '#f4f4f5';
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=2.1.7">
-  <link rel="manifest" href="/manifest.webmanifest?v=2.1.7">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2.1.7">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png?v=2.1.7">
+  <link rel="stylesheet" href="/static/style.css?v=2.1.8">
+  <link rel="manifest" href="/manifest.webmanifest?v=2.1.8">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2.1.8">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png?v=2.1.8">
 </head>
 <body>
 <svg width="0" height="0" class="svg-sprite" aria-hidden="true">
@@ -102,6 +102,13 @@
         <div class="empty-icon" aria-hidden="true"><svg class="empty-clef"><use href="#icon-bass-clef"></use></svg></div>
         <p id="empty-title">Библиотека пуста</p>
         <p id="empty-text" class="muted">Добавьте папки-плейлисты в MUSIC_DIR.</p>
+      </div>
+    </div>
+    <div class="cover-preview" id="cover-preview" role="dialog" aria-label="Обложка трека" tabindex="-1" hidden>
+      <div class="cover-preview-inner">
+        <div class="cover-preview-art" id="cover-preview-art"></div>
+        <div class="cover-preview-title" id="cover-preview-title"></div>
+        <div class="cover-preview-artist" id="cover-preview-artist"></div>
       </div>
     </div>
     <button class="jump-current" id="jump-current" type="button" hidden>К текущему</button>
@@ -208,6 +215,6 @@
 </dialog>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script type="module" src="/static/app.js?v=2.1.7"></script>
+<script type="module" src="/static/app.js?v=2.1.8"></script>
 </body>
 </html>
