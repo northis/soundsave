@@ -16,6 +16,7 @@ from .catalogs import CompositeCatalog, MetadataCatalog
 from .config import Config, ConfigError
 from .discogs_catalog import DiscogsCatalog
 from .downloader import DownloadError
+from .export import PlaylistError, export_playlist
 from .providers.base import ProviderError
 from .providers.zvuk import ZvukProvider
 from .quality import QualityPolicy, TargetFormat
@@ -103,6 +104,31 @@ def build_parser() -> argparse.ArgumentParser:
         '--discogs-delay',
         type=float,
         help='pause between Discogs requests in seconds (default: 2.0)',
+    )
+
+    export_parser = subparsers.add_parser(
+        'export',
+        help='export a playlist for a container: copy lossy tracks, transcode lossless ones to AAC',
+    )
+    export_parser.add_argument('playlist', type=Path, help='foobar2000 .fpl or .m3u8 playlist')
+    export_parser.add_argument('--output', '-o', type=Path, required=True, help='destination folder')
+    export_parser.add_argument('--bitrate', type=int, default=256, help='AAC bitrate in kbps (default: 256)')
+    export_parser.add_argument('--force', action='store_true', help='overwrite files that already exist')
+    export_parser.add_argument('--dry-run', action='store_true', help='show what would be written')
+    export_parser.add_argument('--ffmpeg', type=Path, help='path to the ffmpeg executable')
+    export_parser.add_argument(
+        '--map',
+        dest='mappings',
+        action='append',
+        default=[],
+        metavar='FROM=TO',
+        help='rewrite a path prefix (repeatable)',
+    )
+    export_parser.add_argument('--no-m3u8', action='store_true', help='do not write a playlist next to the files')
+    export_parser.add_argument(
+        '--no-retag',
+        action='store_true',
+        help='keep the original track numbers in copied files',
     )
 
     serve_parser = subparsers.add_parser('serve', help='run the web player and PWA')
@@ -231,6 +257,40 @@ def _run_tags(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_mappings(values: Sequence[str]) -> list[tuple[str, str]]:
+    mappings: list[tuple[str, str]] = []
+    for value in values:
+        old, separator, new = value.partition('=')
+        if not separator or not old:
+            raise ConfigError(f'--map expects FROM=TO, got {value!r}')
+        mappings.append((old, new))
+    return mappings
+
+
+def _run_export(args: argparse.Namespace) -> int:
+    report = export_playlist(
+        args.playlist,
+        args.output,
+        bitrate=args.bitrate,
+        force=args.force,
+        dry_run=args.dry_run,
+        ffmpeg=str(args.ffmpeg) if args.ffmpeg else None,
+        mappings=_parse_mappings(args.mappings),
+        write_m3u8=not args.no_m3u8,
+        retag=not args.no_retag,
+    )
+    logger.info(
+        'Exported %d tracks to %s: copied %d, transcoded %d, skipped %d, failed %d',
+        len(report.files),
+        args.output,
+        report.copied,
+        report.transcoded,
+        report.skipped,
+        report.failed,
+    )
+    return 0 if report.ok else 1
+
+
 def _run_serve(config: Config, args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -327,6 +387,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     try:
+        if args.command == 'export':
+            return _run_export(args)
         config = _override_config(Config.load(args.env_file), args)
         if args.command == 'sync':
             run_sync(config, dry_run=args.dry_run, limit=args.limit)
@@ -343,7 +405,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_scan(config)
         if args.command == 'snapshot':
             return _run_snapshot(config, args)
-    except (ConfigError, ProviderError, ArchiveError, DownloadError, ValueError) as exc:
+    except (ConfigError, ProviderError, ArchiveError, DownloadError, PlaylistError, ValueError) as exc:
         logger.error('%s', exc)
         return 1
     except KeyboardInterrupt:

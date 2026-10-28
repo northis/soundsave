@@ -18,10 +18,10 @@
       if (meta) meta.content = dark ? '#18181b' : '#f4f4f5';
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=2.1.9">
-  <link rel="manifest" href="/manifest.webmanifest?v=2.1.9">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2.1.9">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png?v=2.1.9">
+  <link rel="stylesheet" href="/static/style.css?v=2.2.0">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png">
 </head>
 <body>
 <svg width="0" height="0" class="svg-sprite" aria-hidden="true">
@@ -31,6 +31,7 @@
   <symbol id="icon-next" viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M6 6l9 6-9 6z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="icon-repeat" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
   <symbol id="icon-repeat-one" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><path d="M12 10v4M10.5 11.5h3"/></symbol>
+  <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></symbol>
   <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
   <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
   <symbol id="icon-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15 6L3 15"/><path d="M3 12a9 9 0 0 1 15-6l3 3"/><path d="M3 20v-5h5"/><path d="M21 4v5h-5"/></symbol>
@@ -94,7 +95,7 @@
 
   <main class="main">
     <div class="list-head" id="list-head" aria-hidden="true">
-      <span></span><span></span><span>Композиция</span><span class="album-col">Альбом</span><span>Формат</span><span>Битрейт</span><span>Частота</span><span>Время</span><span></span>
+      <span></span><span></span><span>Композиция</span><span class="album-col">Альбом</span><span>Формат</span><span>Битрейт</span><span class="sample-col">Частота</span><span>Время</span><span></span>
     </div>
     <div class="list-scroll" id="list-scroll">
       <div class="list-canvas" id="list-canvas" role="listbox" aria-label="Треки"></div>
@@ -140,11 +141,13 @@
         <svg class="icon repeat-all-icon" aria-hidden="true"><use href="#icon-repeat"></use></svg>
         <svg class="icon repeat-one-icon" aria-hidden="true"><use href="#icon-repeat-one"></use></svg>
       </button>
+      <button id="shuffle-btn" class="icon-btn shuffle-btn" type="button" title="Перемешать треки" aria-label="Перемешать треки" aria-pressed="false">
+        <svg class="icon" aria-hidden="true"><use href="#icon-shuffle"></use></svg>
+      </button>
     </div>
     <div class="seek-wrap">
-      <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Позиция воспроизведения" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Позиция воспроизведения" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <span class="seek-cached" id="seek-cached"></span>
-        <span class="seek-played" id="seek-played"></span>
         <span class="seek-thumb" id="seek-thumb"></span>
       </div>
       <div class="time"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
@@ -217,6 +220,6 @@
 </dialog>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script type="module" src="/static/app.js?v=2.1.9"></script>
+<script type="module" src="/static/app.js?v=2.2.0"></script>
 </body>
 </html>

@@ -138,6 +138,9 @@ soundsave scan
 
 # Copy the web library database to DATA_DIR/backups
 soundsave snapshot --label manual
+
+# Export a foobar2000 playlist for a container or a portable player
+soundsave export "D:\Music\Playlists\Road trip.fpl" --output "D:\Export\Road trip"
 ```
 
 `soundsave sync` prefers a 320 kbps MP3 stream from Yandex Music. If Yandex
@@ -187,6 +190,38 @@ for `WOAF`.
 `--no-search` skips catalogue search and uses only the Yandex playlist;
 `--no-lyrics` skips lyrics. Yandex text lyrics are not available for every
 track; those files are reported as `lyrics: unavailable`.
+
+### Exporting a playlist for a container
+
+`soundsave export` turns a foobar2000 playlist (`.fpl`, or `.m3u8`/`.m3u`
+exported from it) into a flat folder with one file per playlist item:
+
+```bash
+soundsave export "Road trip.fpl" --output "D:\Export\Road trip" --bitrate 256
+soundsave export "Road trip.fpl" --output ./export --dry-run
+soundsave export "Road trip.fpl" --output ./export --map "D:\Music=/mnt/music"
+```
+
+* Lossy sources (`.mp3`, AAC `.m4a`, `.ogg`, `.opus`, …) are copied as they
+  are; their audio is never re-encoded.
+* Lossless sources (`.flac`, `.ape`, `.wav`, `.aiff`, ALAC, …) are transcoded
+  to AAC in an `.m4a` container with `ffmpeg`, 256 kbps by default.
+* `.ape`/`.flac` albums described by a CUE sheet are split at the sheet's
+  `INDEX` times. Both a `.cue` file in the playlist and subsong items
+  (`album.ape|subsong=N`, as written by foobar2000) are understood.
+* Files are named `<playlist number>. <artist> - <title>.<ext>`, with leading
+  zeros wide enough to keep the folder sortable (`07. …`, `007. …`). Illegal
+  file-name characters are replaced with `_`.
+* Every new file gets the playlist position as its track number; copied lossy
+  files are retagged too unless `--no-retag` is passed.
+* An `<playlist>.m3u8` is written next to the files unless `--no-m3u8` is used.
+* `--force` overwrites existing files; otherwise they are skipped. `--dry-run`
+  only prints the plan. `--map FROM=TO` rewrites a path prefix, which is useful
+  when the playlist was saved on another machine.
+
+`ffmpeg` must be in `PATH` (or passed with `--ffmpeg`) when the playlist
+contains lossless tracks. The web container does not include it, so run the
+export on the host.
 
 ### Matching
 
@@ -280,9 +315,12 @@ The player:
 
 * streams files with HTTP Range, so seeking and fast starts work;
 * shows embedded covers (resized and cached) or a placeholder;
-* supports play/pause, previous/next, seek, repeat off/all/one and volume;
+* supports play/pause, previous/next, a vertical seek slider, shuffle within
+  the current playlist, repeat off/all/one and volume;
 * sorts by playlist number, title or artist and keeps the playing track in the
   centre unless you have scrolled away;
+* uses roomier table columns, wraps the album and title to two lines and shows
+  a tooltip with the full text when even that does not fit;
 * uses a compact bottom panel on desktop and a two-row panel on mobile;
 * opens a large cover preview of the playing track when its row is clicked;
 * follows the device theme by default; system/light/dark is switchable;
@@ -291,20 +329,31 @@ The player:
   commit.
 
 The PWA caches the app shell, API metadata and covers. Playing a track also
-downloads it into the local Cache API (progress is shown as a paler overlay on
-the seek bar), and cached tracks are marked with a check. The cache uses
+downloads it into the local Cache API (progress is shown as a pale blue fill on
+the vertical seek slider), and cached tracks are marked with a check. The
+position in the track is shown only by the slider thumb. The cache uses
 IndexedDB for its LRU index, defaults to 2 GB and can be cleared in Settings.
 This is client-side storage; the server keeps the original files.
 
-For installation on Android, Cloudflare Access must bypass the manifest and
-icons (and `/sw.js` if your proxy blocks it):
+For installation on Android, Cloudflare Access must bypass the manifest, the
+icons and the favicon:
 
 ```text
 /manifest.webmanifest
 /static/icons/*
-/static/favicon.svg
 /favicon.ico
+/favicon.svg
 ```
+
+These paths are served without a query string on purpose. Some Access bypass
+rules compare the whole URL, so a cache-busting `?v=…` suffix made
+`/static/favicon.svg?v=2.1.9` miss the rule and fall back to an Access-protected
+path; the browser then reported `missing Cf-Access-Jwt-Assertion header`.
+Soundsave itself never reads that header — it is added by Cloudflare Access for
+authenticated requests and is missing on bypassed ones. If the error persists,
+check that the Access application has a Bypass policy for exactly these paths
+(and `/sw.js` if your proxy blocks it) and that no Worker in front of the
+container requires the JWT for them.
 
 Do not bypass `/api/*` or `/audio`; those remain behind Access. PWA installation
 requires HTTPS (or localhost); a plain `http://LAN-IP:8765` is not a secure

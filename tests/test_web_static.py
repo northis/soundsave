@@ -35,12 +35,12 @@ def test_icons_use_the_purple_and_yellow_palette() -> None:
 
     assert manifest['background_color'] == '#2e1065'
     assert manifest['theme_color'] == '#2e1065'
-    assert all(icon['src'].endswith('?v=2.1.9') for icon in manifest['icons'])
+    assert all('?v=' not in icon['src'] for icon in manifest['icons'])
     assert '#facc15' in favicon
     assert '#2e1065' in favicon
-    assert '/static/favicon.svg?v=2.1.9' in index
-    assert '/static/icons/apple-touch-icon-180.png?v=2.1.9' in index
-    assert '/manifest.webmanifest?v=2.1.9' in index
+    assert 'href="/favicon.svg"' in index
+    assert '/static/icons/apple-touch-icon-180.png' in index
+    assert 'href="/manifest.webmanifest"' in index
     assert 'icon-bass-clef' in index
     assert 'brand-clef' in index
     assert 'build-badge' in index
@@ -57,12 +57,33 @@ def test_index_has_theme_boot_script_and_pwa_links() -> None:
     assert '/static/app.js' in index
 
 
+def test_player_has_vertical_seek_shuffle_and_tooltips() -> None:
+    index = (STATIC / 'index.html').read_text(encoding='utf-8')
+    style = (STATIC / 'style.css').read_text(encoding='utf-8')
+    app = (STATIC / 'app.js').read_text(encoding='utf-8')
+
+    assert 'aria-orientation="vertical"' in index
+    assert 'seek-played' not in index
+    assert 'seek-played' not in style
+    assert 'shuffle-btn' in index
+    assert 'icon-shuffle' in index
+    assert 'function toggleShuffle' in app
+    assert 'function buildQueue' in app
+    assert 'setupTooltips' in app
+    assert 'data-tooltip' in app
+    assert 'function setupTooltips' in app
+    assert 'box-shadow: 0 0 0 2px var(--panel)' not in style
+    assert '-webkit-line-clamp: 2' in style
+    assert '.tooltip' in style
+    assert 'event.clientY' in app
+
+
 def test_service_worker_caches_shell_and_audio() -> None:
     worker = (STATIC / 'sw.js').read_text(encoding='utf-8')
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v11' in worker
+    assert 'soundsave-shell-v12' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker

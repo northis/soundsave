@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.1.9';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.9';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.1.9';
+import { Player } from './player.js?v=2.2.0';
+import { CacheManager, formatBytes } from './cache.js?v=2.2.0';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.2.0';
 
-const APP_VERSION = '2.1.9';
+const APP_VERSION = '2.2.0';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -16,6 +16,8 @@ const state = {
   currentId: null,
   sort: localStorage.getItem('soundsave:sort') || 'number',
   sortDir: localStorage.getItem('soundsave:sortDir') || 'asc',
+  shuffle: localStorage.getItem('soundsave:shuffle') === '1',
+  queue: [],
   userScrolled: false,
   programmaticScroll: false,
   loading: false,
@@ -254,7 +256,7 @@ async function loadTracks(playlistId, { restore = false, preserveCurrent = false
     const data = await api(`/api/playlists/${playlistId}/tracks`);
     state.tracks = data.tracks || [];
     state.sorted = sortTracks(state.tracks);
-    if (player) player.setQueue(state.sorted);
+    applyQueue();
     if (restore) {
       const params = new URLSearchParams(location.search);
       const fromUrl = Number(params.get('track'));
@@ -325,11 +327,52 @@ function applySort(sort, direction = state.sortDir) {
   });
   $('sort-dir').textContent = direction === 'desc' ? '↓' : '↑';
   state.sorted = sortTracks(state.tracks);
-  if (player) player.setQueue(state.sorted);
+  applyQueue();
   state.userScrolled = false;
   renderList();
   centerCurrent(true);
   updateUrl();
+}
+
+function shuffleTracks(tracks) {
+  const rest = [...tracks];
+  for (let index = rest.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [rest[index], rest[swap]] = [rest[swap], rest[index]];
+  }
+  return rest;
+}
+
+// Playback order: the sorted list, or the current track followed by a random
+// order of the rest while shuffle is on.
+function buildQueue() {
+  if (!state.shuffle) return state.sorted;
+  const current = state.sorted.find((track) => track.id === state.currentId);
+  const rest = state.sorted.filter((track) => track.id !== state.currentId);
+  const shuffled = shuffleTracks(rest);
+  return current ? [current, ...shuffled] : shuffled;
+}
+
+function applyQueue() {
+  state.queue = buildQueue();
+  if (player) player.setQueue(state.queue);
+}
+
+function updateShuffleButton() {
+  const button = $('shuffle-btn');
+  if (!button) return;
+  button.dataset.active = String(state.shuffle);
+  button.setAttribute('aria-pressed', String(state.shuffle));
+  button.title = state.shuffle ? 'Перемешивание включено' : 'Перемешать треки';
+  button.setAttribute('aria-label', button.title);
+}
+
+function toggleShuffle() {
+  state.shuffle = !state.shuffle;
+  localStorage.setItem('soundsave:shuffle', state.shuffle ? '1' : '0');
+  updateShuffleButton();
+  applyQueue();
+  toast(state.shuffle ? 'Перемешивание включено' : 'Перемешивание выключено');
 }
 
 function rowHeight() {
@@ -394,6 +437,7 @@ function buildRow(track, index, height) {
 
   const main = el('div', 'row-main');
   const title = el('div', 'row-title');
+  title.dataset.tooltip = track.title || 'Без названия';
   if (track.id === state.currentId) {
     const eq = el('span', 'eq');
     eq.setAttribute('aria-hidden', 'true');
@@ -402,7 +446,9 @@ function buildRow(track, index, height) {
   }
   title.appendChild(document.createTextNode(track.title || 'Без названия'));
   main.appendChild(title);
-  main.appendChild(el('div', 'row-artist', track.artist || 'Неизвестный исполнитель'));
+  const artist = el('div', 'row-artist', track.artist || 'Неизвестный исполнитель');
+  artist.dataset.tooltip = track.artist || 'Неизвестный исполнитель';
+  main.appendChild(artist);
   const meta = [
     `#${track.number}`,
     track.format,
@@ -413,7 +459,9 @@ function buildRow(track, index, height) {
   main.appendChild(el('div', 'row-meta', meta));
   row.appendChild(main);
 
-  row.appendChild(el('div', 'row-cell album', track.album || '—'));
+  const albumCell = el('div', 'row-cell album', track.album || '—');
+  if (track.album) albumCell.dataset.tooltip = track.album;
+  row.appendChild(albumCell);
   const formatCell = el('div', 'row-cell format');
   formatCell.appendChild(el('span', 'format-badge', track.format || '—'));
   row.appendChild(formatCell);
@@ -574,7 +622,7 @@ function clearCurrent() {
     player.track = null;
     player.audio.removeAttribute('src');
     player.audio.load();
-    player.setQueue(state.sorted);
+    applyQueue();
   }
   updatePlayerTrack(null);
   closePreview();
@@ -593,7 +641,7 @@ function updatePlayerTrack(track) {
     $('play-btn').disabled = true;
     $('prev-btn').disabled = true;
     $('next-btn').disabled = true;
-    $('seek-cached').style.width = '0%';
+    $('seek-cached').style.height = '0%';
     updateSeek(0, 0);
     return;
   }
@@ -617,14 +665,12 @@ function updatePlayerCache(track) {
   button.hidden = false;
   updateCacheIndicator(button, track);
   const status = cacheManager ? cacheManager.state(track) : { status: 'none', progress: 0 };
-  $('seek-cached').style.width = status.status === 'caching' ? `${(status.progress || 0) * 100}%` : '0%';
+  $('seek-cached').style.height = status.status === 'caching' ? `${(status.progress || 0) * 100}%` : '0%';
 }
 
 function updateSeek(current, duration) {
   const progress = duration ? Math.min(1, current / duration) : 0;
-  const percent = `${progress * 100}%`;
-  $('seek-played').style.width = percent;
-  $('seek-thumb').style.left = percent;
+  $('seek-thumb').style.bottom = `${progress * 100}%`;
   $('time-current').textContent = formatTime(current);
   $('time-total').textContent = formatTime(duration);
   const seek = $('seek');
@@ -635,7 +681,7 @@ function updateSeek(current, duration) {
 
 function updateCacheProgress(track, progress) {
   if (!track || track.id !== state.currentId) return;
-  $('seek-cached').style.width = `${Math.max(0, Math.min(1, progress)) * 100}%`;
+  $('seek-cached').style.height = `${Math.max(0, Math.min(1, progress)) * 100}%`;
   const row = document.querySelector(`.track-row[data-id="${track.id}"] .cache-indicator`);
   if (row) updateCacheIndicator(row, track);
 }
@@ -669,10 +715,6 @@ function onTrackChange(track) {
 
 function onTime({ current, duration }) {
   updateSeek(current, duration);
-  if (!state.draggingSeek) {
-    $('seek-played').style.width = `${duration ? Math.min(1, current / duration) * 100 : 0}%`;
-    $('seek-thumb').style.left = `${duration ? Math.min(1, current / duration) * 100 : 0}%`;
-  }
   if (state.playlistId && state.currentId && Date.now() - state.lastPositionSave > 2000) {
     state.lastPositionSave = Date.now();
     localStorage.setItem(`soundsave:position:${state.playlistId}`, String(current));
@@ -869,6 +911,7 @@ function setupEvents() {
     player.cycleRepeat();
     updateRepeatButton();
   });
+  $('shuffle-btn').addEventListener('click', toggleShuffle);
   $('mute-btn').addEventListener('click', () => player.toggleMute());
   $('player-cache').addEventListener('click', () => {
     const track = currentTrack();
@@ -902,6 +945,7 @@ function setupEvents() {
 
   setupSeek();
   setupVolume();
+  setupTooltips();
   setupSettings();
   setupKeyboard();
   setupInstallPrompt();
@@ -931,11 +975,81 @@ function savePosition() {
   localStorage.setItem(`soundsave:position:${state.playlistId}`, String(player.currentTime));
 }
 
+// A line-clamped element reports the clamped height in scrollHeight, so the
+// full text height is measured on a hidden clone with the same width.
+function isTruncated(element) {
+  if (element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1) return true;
+  if (!element.classList.contains('row-title') && !element.classList.contains('album')) return false;
+  const clone = element.cloneNode(true);
+  clone.style.cssText = [
+    'position:absolute', 'left:-9999px', 'top:0', 'visibility:hidden',
+    `width:${element.getBoundingClientRect().width}px`, 'height:auto', 'max-height:none',
+    'display:block', '-webkit-line-clamp:none', 'overflow:visible',
+  ].join(';');
+  document.body.appendChild(clone);
+  const full = clone.scrollHeight;
+  clone.remove();
+  return full > element.clientHeight + 1;
+}
+
+// Cells keep the full text in data-tooltip; the tooltip is shown only when the
+// text really does not fit after two lines.
+function setupTooltips() {
+  const tooltip = el('div', 'tooltip');
+  tooltip.setAttribute('role', 'tooltip');
+  document.body.appendChild(tooltip);
+  let current = null;
+
+  const hide = () => {
+    current = null;
+    tooltip.classList.remove('is-visible');
+  };
+
+  const show = (target) => {
+    const text = target.dataset.tooltip;
+    if (!text) {
+      hide();
+      return;
+    }
+    const truncated = isTruncated(target);
+    if (!truncated) {
+      hide();
+      return;
+    }
+    current = target;
+    tooltip.textContent = text;
+    tooltip.classList.add('is-visible');
+    const rect = target.getBoundingClientRect();
+    const box = tooltip.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - box.width / 2, window.innerWidth - box.width - 8));
+    let top = rect.top - box.height - 6;
+    if (top < 8) top = rect.bottom + 6;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  };
+
+  const canvas = $('list-canvas');
+  canvas.addEventListener('pointerover', (event) => {
+    if (event.pointerType === 'touch') return;
+    const target = event.target.closest('[data-tooltip]');
+    if (target && target !== current) show(target);
+  });
+  canvas.addEventListener('pointerout', (event) => {
+    const target = event.target.closest('[data-tooltip]');
+    if (target && target === current && !target.contains(event.relatedTarget)) hide();
+  });
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'touch') hide();
+  });
+  $('list-scroll').addEventListener('scroll', hide, { passive: true });
+  window.addEventListener('resize', hide);
+}
+
 function setupSeek() {
   const seek = $('seek');
   const ratio = (event) => {
     const rect = seek.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    return Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height));
   };
   seek.addEventListener('pointerdown', (event) => {
     if (!player.duration) return;
@@ -952,9 +1066,12 @@ function setupSeek() {
   seek.addEventListener('pointercancel', finish);
   seek.addEventListener('keydown', (event) => {
     if (!player.duration) return;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
       event.preventDefault();
-      player.seek(player.currentTime + (event.key === 'ArrowLeft' ? -5 : 5));
+      player.seek(player.currentTime + 5);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      player.seek(player.currentTime - 5);
     } else if (event.key === 'Home') {
       event.preventDefault();
       player.seek(0);
@@ -1182,6 +1299,7 @@ async function init() {
   applySort(state.sort, state.sortDir);
   setupEvents();
   updateRepeatButton();
+  updateShuffleButton();
   updateVolume();
   updatePlayerTrack(null);
   await loadVersion();

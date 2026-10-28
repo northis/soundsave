@@ -45,6 +45,21 @@ def test_web_parser_has_serve_and_scan() -> None:
     assert snapshot.keep == 4
 
 
+def test_export_parser() -> None:
+    args = build_parser().parse_args(
+        ['export', 'list.fpl', '-o', 'out', '--bitrate', '192', '--map', 'D:/Music=/music', '--dry-run'],
+    )
+
+    assert args.command == 'export'
+    assert args.playlist == Path('list.fpl')
+    assert args.output == Path('out')
+    assert args.bitrate == 192
+    assert args.mappings == ['D:/Music=/music']
+    assert args.dry_run is True
+    assert args.no_m3u8 is False
+    assert args.no_retag is False
+
+
 def test_snapshot_copies_the_web_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = make_config(tmp_path)
     monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)

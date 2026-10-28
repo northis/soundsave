@@ -11,7 +11,7 @@ from typing import Annotated
 from urllib.parse import quote, urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from ..config import Config
@@ -141,9 +141,24 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
     def index() -> FileResponse:
         return FileResponse(STATIC / 'index.html', media_type='text/html', headers={'Cache-Control': 'no-cache'})
 
+    # PWA assets that Cloudflare Access bypasses must be reachable without a
+    # query string: some Access rules compare the full URL, and a redirect to
+    # `/static/...` would send the browser to a protected path anyway.
     @app.get('/favicon.ico')
-    def favicon() -> RedirectResponse:
-        return RedirectResponse('/static/favicon.svg?v=2.1.9')
+    def favicon() -> FileResponse:
+        return FileResponse(
+            STATIC / 'icons' / 'apple-touch-icon-180.png',
+            media_type='image/png',
+            headers={'Cache-Control': 'public, max-age=86400'},
+        )
+
+    @app.get('/favicon.svg')
+    def favicon_svg() -> FileResponse:
+        return FileResponse(
+            STATIC / 'favicon.svg',
+            media_type='image/svg+xml',
+            headers={'Cache-Control': 'public, max-age=86400'},
+        )
 
     @app.get('/manifest.webmanifest')
     def manifest() -> FileResponse:

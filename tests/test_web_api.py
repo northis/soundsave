@@ -268,6 +268,11 @@ def test_pwa_assets_are_served(root: Path) -> None:
         assert icon.status_code == 200
         assert icon.headers['content-type'] == 'image/png'
 
-        favicon = client.get('/favicon.ico', follow_redirects=False)
-        assert favicon.status_code in {307, 308}
-        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.9')
+        favicon = client.get('/favicon.ico')
+        assert favicon.status_code == 200
+        assert favicon.headers['content-type'] == 'image/png'
+        assert favicon.headers['cache-control'] == 'public, max-age=86400'
+
+        icon_svg = client.get('/favicon.svg')
+        assert icon_svg.status_code == 200
+        assert icon_svg.headers['content-type'] == 'image/svg+xml'

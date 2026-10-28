@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-29
+
+### Added
+
+- `soundsave export` turns a foobar2000 playlist (`.fpl`/`.m3u8`) into a flat
+  folder for a container or portable player: lossy tracks are copied, lossless
+  ones are transcoded to 256 kbps AAC (`.m4a`) with `ffmpeg`. CUE sheets split
+  `.ape`/`.flac` albums into separate tracks, and output names are
+  `<number>. <artist> - <title>.<ext>` with sortable leading zeros.
+- Shuffle playback within the current playlist, with the state remembered.
+- A tooltip with the full text for table cells that still do not fit after two
+  lines.
+
+### Changed
+
+- The seek bar is vertical and has no white outline around the thumb. The
+  played part is no longer filled; only the thumb shows the position, and the
+  cache/download progress is a pale blue fill.
+- The album column is much wider, and long titles and album names wrap to two
+  lines before being truncated.
+
+### Fixed
+
+- `/favicon.ico` is served directly instead of redirecting to a versioned
+  `/static/...` URL, and the PWA assets use stable paths without `?v=…`.
+  Cloudflare Access bypass rules that compare the whole URL no longer miss the
+  favicon, which surfaced as `missing Cf-Access-Jwt-Assertion header`.
+- The "Частота" header is hidden together with the sample-rate column on
+  narrow screens, so the header and the rows stay aligned.
+
 ## [2.1.9] - 2026-10-29
 
 ### Fixed
