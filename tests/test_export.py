@@ -197,7 +197,7 @@ def test_export_copies_lossy_and_transcodes_lossless(tmp_path: Path, monkeypatch
     monkeypatch.setattr('soundsave.export._transcode', fake_transcode)
     output = tmp_path / 'out'
 
-    report = export_playlist(playlist, output, retag=False)
+    report = export_playlist(playlist, output, retag=False, ffmpeg='ffmpeg')
 
     assert report.ok
     assert report.copied == 1
@@ -240,7 +240,7 @@ def test_export_transcodes_each_cue_track(tmp_path: Path, monkeypatch: pytest.Mo
     monkeypatch.setattr('soundsave.export._transcode', fake_transcode)
     output = tmp_path / 'out'
 
-    report = export_playlist(playlist, output)
+    report = export_playlist(playlist, output, ffmpeg='ffmpeg')
 
     assert report.ok
     assert report.transcoded == 2
@@ -262,6 +262,18 @@ def test_export_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert report.copied == 1
     assert report.transcoded == 0
     assert not output.exists()
+
+
+def test_export_requires_ffmpeg_for_lossless_tracks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'two.flac').write_bytes(b'not really flac')
+    playlist = source / 'list.m3u8'
+    playlist.write_text('#EXTM3U\ntwo.flac\n', encoding='utf-8')
+    monkeypatch.setattr('soundsave.export.shutil.which', lambda _: None)
+
+    with pytest.raises(PlaylistError, match='ffmpeg is required'):
+        export_playlist(playlist, tmp_path / 'out')
 
 
 def test_export_rejects_a_missing_playlist(tmp_path: Path) -> None:
