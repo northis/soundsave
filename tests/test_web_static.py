@@ -35,12 +35,12 @@ def test_icons_use_the_purple_and_yellow_palette() -> None:
 
     assert manifest['background_color'] == '#2e1065'
     assert manifest['theme_color'] == '#2e1065'
-    assert all(icon['src'].endswith('?v=2.1.4') for icon in manifest['icons'])
+    assert all(icon['src'].endswith('?v=2.1.5') for icon in manifest['icons'])
     assert '#facc15' in favicon
     assert '#2e1065' in favicon
-    assert '/static/favicon.svg?v=2.1.4' in index
-    assert '/static/icons/apple-touch-icon-180.png?v=2.1.4' in index
-    assert '/manifest.webmanifest?v=2.1.4' in index
+    assert '/static/favicon.svg?v=2.1.5' in index
+    assert '/static/icons/apple-touch-icon-180.png?v=2.1.5' in index
+    assert '/manifest.webmanifest?v=2.1.5' in index
     assert 'icon-bass-clef' in index
     assert 'brand-clef' in index
     assert 'build-badge' in index
@@ -62,13 +62,16 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v6' in worker
+    assert 'soundsave-shell-v7' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker
     assert 'parseRange' in worker
     assert "preload = 'auto'" in player
     assert 'document.body.appendChild(this.audio)' in player
+    assert "position: 'fixed'" in player
+    assert "opacity: '0'" in player
+    assert "display = 'none'" not in player
     assert 'cancelActive' in cache
     assert "visibilityState !== 'visible'" in cache
 

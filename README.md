@@ -295,6 +295,8 @@ icons (and `/sw.js` if your proxy blocks it):
 ```text
 /manifest.webmanifest
 /static/icons/*
+/static/favicon.svg
+/favicon.ico
 ```
 
 Do not bypass `/api/*` or `/audio`; those remain behind Access. PWA installation

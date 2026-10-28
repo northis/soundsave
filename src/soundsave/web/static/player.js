@@ -6,9 +6,19 @@ export class Player {
     this.audio.preload = 'auto';
     this.audio.setAttribute('playsinline', '');
     this.audio.setAttribute('aria-hidden', 'true');
-    this.audio.style.display = 'none';
-    // Keep the media element in the document: some Android Chromium builds
-    // handle background playback more reliably when it is not detached.
+    // Keep the media element in the document and rendered. A display:none
+    // element is still detached from the rendering tree on some Android
+    // Chromium builds, which can make the page look inactive and freeze it
+    // while the screen is off. A transparent 1px element stays rendered.
+    Object.assign(this.audio.style, {
+      position: 'fixed',
+      left: '-10px',
+      bottom: '0',
+      width: '1px',
+      height: '1px',
+      opacity: '0',
+      pointerEvents: 'none',
+    });
     document.body.appendChild(this.audio);
     this.resolveSource = resolveSource || ((track) => track.audio_url);
     this.queue = [];
@@ -19,6 +29,7 @@ export class Player {
     if (!Number.isFinite(this.volume)) this.volume = 1;
     this.muted = false;
     this.startAt = 0;
+    this.lastPositionState = 0;
     this.onTrackChange = onTrackChange || (() => {});
     this.onTime = onTime || (() => {});
     this.onState = onState || (() => {});
@@ -115,6 +126,7 @@ export class Player {
       if (this.queue.length) this.setTrack(this.queue[0], { autoplay: true });
       return;
     }
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     const result = this.audio.play();
     if (result && typeof result.catch === 'function') {
       result.catch(() => this.onState({ playing: false, loading: false }));
@@ -123,6 +135,7 @@ export class Player {
 
   pause() {
     this.audio.pause();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }
 
   toggle() {
@@ -223,6 +236,10 @@ export class Player {
       duration,
       progress: duration ? current / duration : 0,
     });
+    if (Date.now() - this.lastPositionState > 1000) {
+      this.lastPositionState = Date.now();
+      this._updatePositionState();
+    }
   }
 
   _updateMetadata() {

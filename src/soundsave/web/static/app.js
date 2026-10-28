@@ -1,5 +1,5 @@
-import { Player } from './player.js?v=2.1.4';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.4';
+import { Player } from './player.js?v=2.1.5';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.5';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -827,10 +827,14 @@ function setupEvents() {
       if (cacheManager) cacheManager.cancelActive();
       return;
     }
-    if (state.wasPlayingBeforeHidden && player && player.audio.paused) {
-      player.play();
-    }
+    const wasPlaying = state.wasPlayingBeforeHidden;
     state.wasPlayingBeforeHidden = false;
+    if (wasPlaying) {
+      // Give Android a moment to bring Wi-Fi/DNS back after the screen wakes.
+      setTimeout(() => {
+        if (player && player.audio.paused) player.play();
+      }, 400);
+    }
   });
 }
 

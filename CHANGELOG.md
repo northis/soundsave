@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.5] - 2026-10-28
+
+### Fixed
+
+- The hidden `<audio>` element is now rendered as a transparent 1px element
+  instead of `display: none`. Some Android Chromium builds stop treating a
+  detached media element as active and freeze the page while the screen is off.
+- Media Session position is refreshed during playback, and the playback state
+  is set explicitly on play/pause.
+- Returning to the app waits briefly for Wi-Fi/DNS to recover before resuming
+  playback.
+- The Cloudflare Access bypass documentation now includes the favicon paths;
+  the 401 was unrelated to audio playback.
+
 ## [2.1.4] - 2026-10-28
 
 ### Added
