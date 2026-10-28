@@ -35,14 +35,17 @@ def test_icons_use_the_purple_and_yellow_palette() -> None:
 
     assert manifest['background_color'] == '#2e1065'
     assert manifest['theme_color'] == '#2e1065'
-    assert all(icon['src'].endswith('?v=2.1.3') for icon in manifest['icons'])
+    assert all(icon['src'].endswith('?v=2.1.4') for icon in manifest['icons'])
     assert '#facc15' in favicon
     assert '#2e1065' in favicon
-    assert '/static/favicon.svg?v=2.1.3' in index
-    assert '/static/icons/apple-touch-icon-180.png?v=2.1.3' in index
-    assert '/manifest.webmanifest?v=2.1.3' in index
+    assert '/static/favicon.svg?v=2.1.4' in index
+    assert '/static/icons/apple-touch-icon-180.png?v=2.1.4' in index
+    assert '/manifest.webmanifest?v=2.1.4' in index
     assert 'icon-bass-clef' in index
     assert 'brand-clef' in index
+    assert 'build-badge' in index
+    assert 'settings-version' in index
+    assert 'settings-commit' in index
 
 
 def test_index_has_theme_boot_script_and_pwa_links() -> None:
@@ -59,7 +62,7 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v5' in worker
+    assert 'soundsave-shell-v6' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker

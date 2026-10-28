@@ -122,6 +122,17 @@ button { cursor: pointer; }
 .icon-btn.small { width: 24px; height: 24px; }
 .icon-btn.small .icon { width: 14px; height: 14px; }
 .spacer { flex: 1; }
+.build-badge, .settings-build {
+  display: flex; align-items: center; gap: 5px;
+  color: var(--muted); font-size: 10px; white-space: nowrap;
+}
+.build-badge a, .settings-build a {
+  color: inherit; text-decoration: none; border-bottom: 1px dotted var(--border);
+}
+.build-badge a:hover, .settings-build a:hover {
+  color: var(--text); border-bottom-color: var(--text);
+}
+.build-badge .sep, .settings-build .sep { color: var(--border); }
 
 .sort-control { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; white-space: nowrap; }
 .sort-control button {
@@ -364,20 +375,22 @@ button { cursor: pointer; }
 @media (max-width: 900px) {
   .list-head, .track-row { grid-template-columns: 34px 42px minmax(0, 1fr) 54px 64px 48px 26px; }
   .sample-col, .row-cell.sample { display: none; }
+  .build-badge { display: none; }
 }
 @media (max-width: 760px) {
   :root { --row-h: 78px; }
   .app-shell { grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .topbar {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      "brand playlist sync theme"
-      "sort sort refresh settings";
+      "brand playlist sync build theme"
+      "sort sort refresh settings settings";
     padding: 6px 8px;
     gap: 6px;
     min-height: 0;
   }
+  .build-badge { display: flex; grid-area: build; font-size: 9px; }
   .brand { grid-area: brand; }
   .brand-name { display: none; }
   .playlist-picker { grid-area: playlist; min-width: 0; }

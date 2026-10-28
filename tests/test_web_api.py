@@ -143,6 +143,10 @@ def test_version_reports_build_metadata(root: Path, monkeypatch: pytest.MonkeyPa
 
     assert data['version'] == '2.1.0-test'
     assert data['commit'] == 'abcdef123456'
+    assert data['short'] == 'abcdef1'
+    assert data['tag'] == 'v2.1.0-test'
+    assert data['tag_url'].endswith('/releases/tag/v2.1.0-test')
+    assert data['commit_url'].endswith('/commit/abcdef123456')
 
 
 def test_pwa_assets_are_served(root: Path) -> None:
@@ -167,4 +171,4 @@ def test_pwa_assets_are_served(root: Path) -> None:
 
         favicon = client.get('/favicon.ico', follow_redirects=False)
         assert favicon.status_code in {307, 308}
-        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.3')
+        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.4')

@@ -14,7 +14,7 @@ from pathlib import Path
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.ttLib import TTFont
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = Path(__file__).resolve().parent / 'assets'
@@ -52,7 +52,8 @@ def draw_icon(*, maskable: bool) -> Image.Image:
         image.putalpha(mask)
     font_size = int(SIZE * (0.64 if maskable else 0.78))
     font = ImageFont.truetype(str(FONT), font_size)
-    draw = ImageDraw.Draw(image)
+    glyph = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(glyph)
     bbox = draw.textbbox((0, 0), GLYPH, font=font)
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
@@ -62,6 +63,10 @@ def draw_icon(*, maskable: bool) -> Image.Image:
         font=font,
         fill=YELLOW,
     )
+    # The SVG favicon uses the font outline as-is, which is y-up and therefore
+    # appears vertically mirrored in SVG coordinates. Mirror the PNG glyph too
+    # so the header, favicon and PWA icon show the same upside-down clef.
+    image.alpha_composite(ImageOps.flip(glyph))
     return image
 
 

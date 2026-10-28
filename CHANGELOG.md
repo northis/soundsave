@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.4] - 2026-10-28
+
+### Added
+
+- A build badge in the top-right corner (and in Settings on narrow screens)
+  shows the running release tag and short commit, both linked to GitHub. The
+  values come from `/api/version` and the Docker build arguments.
+- `/api/version` now returns `short`, `tag`, `tag_url`, `commit_url`,
+  `repo_url`, `commit_date` and `dirty` in addition to version and commit.
+
+### Changed
+
+- The PWA and static PNG icons now use the vertically mirrored bass clef that
+  the header and favicon already showed. All variants (normal, maskable,
+  apple-touch and favicon) are now visually consistent.
+
 ## [2.1.3] - 2026-10-28
 
 ### Fixed

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "soundsave"
-version = "2.1.3"
+version = "2.1.4"
 description = "Downloader and organizer for Yandex Music and Zvuk: keeps a local playlist archive and upgrades it to 320 kbps MP3 or FLAC."
 readme = "README.md"
 requires-python = ">=3.10"

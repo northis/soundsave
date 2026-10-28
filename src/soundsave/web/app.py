@@ -119,7 +119,7 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @app.get('/favicon.ico')
     def favicon() -> RedirectResponse:
-        return RedirectResponse('/static/favicon.svg?v=2.1.3')
+        return RedirectResponse('/static/favicon.svg?v=2.1.4')
 
     @app.get('/manifest.webmanifest')
     def manifest() -> FileResponse:
@@ -144,7 +144,7 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
         return {'status': 'ok'}
 
     @app.get('/api/version')
-    def version() -> dict[str, str]:
+    def version() -> dict[str, str | bool]:
         return build_info()
 
     @app.get('/api/playlists')

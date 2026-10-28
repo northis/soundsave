@@ -1,5 +1,5 @@
-import { Player } from './player.js?v=2.1.3';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.3';
+import { Player } from './player.js?v=2.1.4';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.4';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -978,10 +978,42 @@ function setupInstallPrompt() {
   if (window.matchMedia('(display-mode: standalone)').matches) $('install-btn').hidden = true;
 }
 
+function setBuildLink(id, text, url, title) {
+  const link = $(id);
+  if (!link) return;
+  link.textContent = text;
+  if (url) link.href = url;
+  else link.removeAttribute('href');
+  if (title) link.title = title;
+  else link.removeAttribute('title');
+}
+
+function renderBuildInfo(info) {
+  const version = info.version || '';
+  const short = info.short || (info.commit ? info.commit.slice(0, 7) : '');
+  const tag = info.tag || (version ? `v${version}` : '');
+  const versionUrl = info.tag_url || '';
+  const commitUrl = info.commit_url || '';
+  const commitTitle = [
+    short ? `commit ${short}` : '',
+    info.commit_date ? String(info.commit_date).slice(0, 10) : '',
+    info.dirty ? 'есть незакоммиченные изменения' : '',
+  ].filter(Boolean).join(', ');
+  for (const prefix of ['build', 'settings']) {
+    setBuildLink(`${prefix}-version`, tag, versionUrl, `Релиз ${tag}`);
+    setBuildLink(`${prefix}-commit`, short, commitUrl, commitTitle);
+    const commit = $(`${prefix}-commit`);
+    const separator = $(`${prefix}-sep`);
+    if (commit) commit.hidden = !short;
+    if (separator) separator.hidden = !(tag && short);
+  }
+  const badge = $('build-badge');
+  if (badge) badge.hidden = !version;
+}
+
 async function loadVersion() {
   try {
-    const data = await api('/api/version');
-    $('version').textContent = data.version || '';
+    renderBuildInfo(await api('/api/version'));
   } catch (error) { /* version is optional */ }
 }
 

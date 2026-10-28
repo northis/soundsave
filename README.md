@@ -278,7 +278,10 @@ The player:
 * sorts by playlist number, title or artist and keeps the playing track in the
   centre unless you have scrolled away;
 * uses a compact bottom panel on desktop and a two-row panel on mobile;
-* follows the device theme by default; system/light/dark is switchable.
+* follows the device theme by default; system/light/dark is switchable;
+* shows the running release tag and short commit in the top-right corner
+  (also in Settings on narrow screens), linked to the GitHub release and
+  commit.
 
 The PWA caches the app shell, API metadata and covers. Playing a track also
 downloads it into the local Cache API (progress is shown as a paler overlay on
