@@ -119,7 +119,7 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @app.get('/favicon.ico')
     def favicon() -> RedirectResponse:
-        return RedirectResponse('/static/favicon.svg?v=2.1.6')
+        return RedirectResponse('/static/favicon.svg?v=2.1.7')
 
     @app.get('/manifest.webmanifest')
     def manifest() -> FileResponse:
@@ -154,6 +154,17 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
             {'playlists': [_playlist_json(row, sync_available=sync_available) for row in rows]},
             headers={'Cache-Control': 'no-store'},
         )
+
+    @app.post('/api/diag', dependencies=[Depends(require_write)])
+    async def diag_upload(request: Request) -> dict[str, bool]:
+        """Write a client playback journal into the server log."""
+        try:
+            payload = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail='Invalid JSON') from exc
+        text = str(payload.get('text', '') if isinstance(payload, dict) else '')[:200_000]
+        logger.info('Client diagnostics:\n%s', text)
+        return {'ok': True}
 
     @app.post('/api/refresh', dependencies=[Depends(require_write)])
     def refresh(force: bool = False) -> JSONResponse:

@@ -35,7 +35,9 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { height: 100%; }
+/* Only the track list scrolls: the page itself never does, so the top bar and
+   the player stay fixed (also on mobile, where 100vh exceeds the viewport). */
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   margin: 0;
   background: var(--bg);
@@ -60,8 +62,9 @@ button { cursor: pointer; }
 .icon.sm { width: 14px; height: 14px; }
 
 .app-shell {
+  height: 100vh;
   height: 100dvh;
-  min-height: 100vh;
+  overflow: hidden;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
@@ -352,6 +355,12 @@ button { cursor: pointer; }
 .field.checkbox input { accent-color: var(--accent); }
 .cache-line { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-label { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.diag-text {
+  width: 100%; height: 160px; resize: vertical; box-sizing: border-box;
+  font: 10px/1.35 var(--font-mono, ui-monospace, monospace);
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+}
 .settings-foot { display: flex; justify-content: space-between; border-top: 1px solid var(--border-soft); padding-top: 10px; color: var(--muted); font-size: 10px; }
 
 .toasts { position: fixed; right: 14px; bottom: 86px; z-index: 50; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }

@@ -1,6 +1,6 @@
 /* Soundsave service worker: app shell, API fallback, covers and audio cache. */
 
-const SHELL_CACHE = 'soundsave-shell-v8';
+const SHELL_CACHE = 'soundsave-shell-v9';
 const AUDIO_CACHE = 'soundsave-audio-v1';
 const COVER_CACHE = 'soundsave-covers-v1';
 const API_CACHE = 'soundsave-api-v1';
@@ -8,16 +8,17 @@ const KEEP = new Set([SHELL_CACHE, AUDIO_CACHE, COVER_CACHE, API_CACHE]);
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=2.1.6',
-  '/static/app.js?v=2.1.6',
-  '/static/player.js?v=2.1.6',
-  '/static/cache.js?v=2.1.6',
-  '/static/favicon.svg?v=2.1.6',
-  '/static/icons/icon-192.png?v=2.1.6',
-  '/static/icons/icon-512.png?v=2.1.6',
-  '/static/icons/maskable-512.png?v=2.1.6',
-  '/static/icons/apple-touch-icon-180.png?v=2.1.6',
-  '/manifest.webmanifest?v=2.1.6',
+  '/static/style.css?v=2.1.7',
+  '/static/app.js?v=2.1.7',
+  '/static/player.js?v=2.1.7',
+  '/static/cache.js?v=2.1.7',
+  '/static/diag.js?v=2.1.7',
+  '/static/favicon.svg?v=2.1.7',
+  '/static/icons/icon-192.png?v=2.1.7',
+  '/static/icons/icon-512.png?v=2.1.7',
+  '/static/icons/maskable-512.png?v=2.1.7',
+  '/static/icons/apple-touch-icon-180.png?v=2.1.7',
+  '/manifest.webmanifest?v=2.1.7',
 ];
 
 self.addEventListener('install', (event) => {
@@ -189,7 +190,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname === '/manifest.webmanifest?v=2.1.6' || url.pathname.startsWith('/static/')) {
+  if (url.pathname === '/manifest.webmanifest?v=2.1.7' || url.pathname.startsWith('/static/')) {
     event.respondWith(cacheFirst(request));
   }
 });

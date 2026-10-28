@@ -80,6 +80,19 @@ def test_cover_is_served_as_webp(root: Path) -> None:
         assert response.content.startswith(b'RIFF')
 
 
+def test_diag_upload_logs_client_journal(root: Path, caplog) -> None:
+    with make_client(root) as client:
+        assert client.post('/api/diag', json={'text': 'x'}).status_code == 403
+        with caplog.at_level('INFO'):
+            response = client.post(
+                '/api/diag',
+                json={'text': 'audio:pause pos=12.0'},
+                headers={'X-Soundsave-Request': '1'},
+            )
+        assert response.status_code == 200
+        assert 'audio:pause pos=12.0' in caplog.text
+
+
 def test_writes_require_csrf_header_and_readonly_playlists(root: Path) -> None:
     with make_client(root) as client:
         playlists = client.get('/api/playlists').json()['playlists']
@@ -171,4 +184,4 @@ def test_pwa_assets_are_served(root: Path) -> None:
 
         favicon = client.get('/favicon.ico', follow_redirects=False)
         assert favicon.status_code in {307, 308}
-        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.6')
+        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.7')

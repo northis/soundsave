@@ -1,3 +1,4 @@
+import { diag } from './diag.js?v=2.1.7';
 /* Audio playback, repeat modes and Media Session integration. */
 
 export class Player {
@@ -79,8 +80,8 @@ export class Player {
   _wireMediaSession() {
     if (!('mediaSession' in navigator)) return;
     const actions = {
-      play: () => this.play(),
-      pause: () => this.pause(),
+      play: () => { diag('session:play'); this.play(); },
+      pause: () => { diag('session:pause'); this.pause(); },
       previoustrack: () => this.previous(),
       nexttrack: () => this.next(),
       seekbackward: (details) => this.seek(this.audio.currentTime - (details.seekOffset || 10)),
@@ -137,6 +138,7 @@ export class Player {
       if (this.queue.length) this.setTrack(this.queue[0], { autoplay: true });
       return;
     }
+    diag('player:play', { track: this.track.id });
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     const result = this.audio.play();
     if (result && typeof result.catch === 'function') {
@@ -145,6 +147,7 @@ export class Player {
   }
 
   pause() {
+    diag('player:pause');
     this.audio.pause();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }
@@ -189,8 +192,10 @@ export class Player {
       if (this.memory.get(track.id) !== entry || !blob) return;
       entry.controller = null;
       entry.url = URL.createObjectURL(blob);
+      diag('memory:ready', { track: track.id, mb: (blob.size / 1048576).toFixed(1) });
       if (this.track && this.track.id === track.id) this._swapToMemory(entry.url);
-    }).catch(() => {
+    }).catch((error) => {
+      diag('memory:fail', { track: track.id, why: error && error.name });
       if (this.memory.get(track.id) === entry) this.memory.delete(track.id);
     });
   }
@@ -198,6 +203,7 @@ export class Player {
   _swapToMemory(url) {
     if (this.audio.src === url) return;
     const position = this.audio.currentTime || this.startAt;
+    diag('memory:swap', { pos: position.toFixed(1) });
     const playing = !this.audio.paused;
     this.startAt = position;
     this.audio.src = url;

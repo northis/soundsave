@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.7] - 2026-10-28
+
+### Added
+
+- Playback diagnostics: audio, Media Session, visibility/freeze and network
+  events plus a 15 s heartbeat are kept in a local journal. Settings can copy
+  it or send it to the server (`POST /api/diag`, written to the container log).
+
+### Changed
+
+- Only the track list scrolls; the page itself no longer scrolls, so the top
+  bar and the player stay in place on mobile.
+- Cleaner refresh, settings, theme and download icons.
+
 ## [2.1.6] - 2026-10-28
 
 ### Fixed

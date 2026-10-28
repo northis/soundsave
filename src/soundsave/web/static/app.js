@@ -1,5 +1,8 @@
-import { Player } from './player.js?v=2.1.6';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.6';
+import { Player } from './player.js?v=2.1.7';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.7';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.1.7';
+
+const APP_VERSION = '2.1.7';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -942,6 +945,29 @@ function setupSettings() {
     await state.installPrompt.userChoice;
     state.installPrompt = null;
     $('install-btn').hidden = true;
+  });
+  $('diag-copy').addEventListener('click', async () => {
+    const text = diagText();
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Журнал скопирован');
+    } catch (error) {
+      $('diag-text').hidden = false;
+      $('diag-text').value = text;
+      $('diag-text').select();
+    }
+  });
+  $('diag-send').addEventListener('click', async () => {
+    try {
+      await api('/api/diag', { method: 'POST', body: { text: diagText() } });
+      toast('Журнал отправлен на сервер');
+    } catch (error) {
+      toast(error.message, { error: true });
+    }
+  });
+  $('diag-clear').addEventListener('click', () => {
+    diagClear();
+    toast('Журнал очищен');
   });
   dialog.addEventListener('close', () => {});
 }
