@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.6] - 2026-10-28
+
+### Fixed
+
+- The current and the next track are now loaded fully into memory (from the
+  offline cache when available) and played from a Blob URL. Android throttles
+  the network of a locked page even with an active media session, so a Range
+  stream stalled and the music stopped once its buffer ran out.
+- The hidden `<audio>` element is really rendered now: Chromium hides `<audio>`
+  without `controls` with a `display:none !important` UA rule, so the 2.1.5
+  change had no effect.
+
 ## [2.1.5] - 2026-10-28
 
 ### Fixed

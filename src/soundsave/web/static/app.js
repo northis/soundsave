@@ -1,5 +1,5 @@
-import { Player } from './player.js?v=2.1.5';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.5';
+import { Player } from './player.js?v=2.1.6';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.6';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -645,6 +645,27 @@ function playbackSource(track) {
   return `${track.audio_url}${separator}stream=1`;
 }
 
+// Whole file for in-memory playback: from the Cache API when downloaded,
+// otherwise straight from the server (bypassing the service worker).
+async function loadTrackBlob(track, signal) {
+  if (!track || !track.audio_url) return null;
+  if (cacheManager) {
+    try {
+      const cached = await cacheManager.cachedBlob(track);
+      if (cached && cached.size) return cached;
+    } catch (error) { /* fall back to the network */ }
+  }
+  const separator = track.audio_url.includes('?') ? '&' : '?';
+  const response = await fetch(`${track.audio_url}${separator}stream=1`, {
+    credentials: 'same-origin',
+    signal,
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const blob = await response.blob();
+  if (!blob.size || !/^audio\//.test(blob.type || 'audio/')) throw new Error('Not audio');
+  return blob;
+}
+
 function autoCache(track) {
   if (!cacheManager || !cacheManager.available) return;
   if (document.visibilityState !== 'visible' || navigator.onLine === false) return;
@@ -1048,6 +1069,7 @@ async function init() {
     onState: onPlayerState,
     onError: (message) => toast(message, { error: true }),
     resolveSource: playbackSource,
+    loadBlob: loadTrackBlob,
   });
   cacheManager = new CacheManager({
     onChange: onCacheChange,

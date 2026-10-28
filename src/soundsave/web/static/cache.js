@@ -107,6 +107,13 @@ export class CacheManager {
     return { status: entry.status || 'cached', progress: entry.progress || 0, size: entry.size || 0 };
   }
 
+  async cachedBlob(track) {
+    if (!this.available || !this.isCached(track)) return null;
+    const cache = await caches.open(AUDIO_CACHE);
+    const response = await cache.match(new Request(track.audio_url));
+    return response ? response.blob() : null;
+  }
+
   isCached(track) {
     return this.state(track).status === 'cached';
   }

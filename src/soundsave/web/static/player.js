@@ -1,16 +1,21 @@
 /* Audio playback, repeat modes and Media Session integration. */
 
 export class Player {
-  constructor({ onTrackChange, onTime, onState, onError, resolveSource } = {}) {
+  constructor({ onTrackChange, onTime, onState, onError, resolveSource, loadBlob } = {}) {
     this.audio = new Audio();
     this.audio.preload = 'auto';
     this.audio.setAttribute('playsinline', '');
     this.audio.setAttribute('aria-hidden', 'true');
+    // Chromium hides <audio> without controls via a UA `display:none
+    // !important` rule, so `controls` is required for it to stay rendered.
+    this.audio.controls = true;
+    this.audio.tabIndex = -1;
     // Keep the media element in the document and rendered. A display:none
     // element is still detached from the rendering tree on some Android
     // Chromium builds, which can make the page look inactive and freeze it
     // while the screen is off. A transparent 1px element stays rendered.
     Object.assign(this.audio.style, {
+      display: 'block',
       position: 'fixed',
       left: '-10px',
       bottom: '0',
@@ -21,6 +26,8 @@ export class Player {
     });
     document.body.appendChild(this.audio);
     this.resolveSource = resolveSource || ((track) => track.audio_url);
+    this.loadBlob = loadBlob || null;
+    this.memory = new Map();
     this.queue = [];
     this.track = null;
     this.repeat = localStorage.getItem('soundsave:repeat') || 'off';
@@ -44,6 +51,7 @@ export class Player {
     this.audio.addEventListener('durationchange', () => this._emitTime());
     this.audio.addEventListener('progress', () => this._emitTime());
     this.audio.addEventListener('play', () => this.onState({ playing: true, loading: false }));
+    this.audio.addEventListener('playing', () => this._prefetchNext());
     this.audio.addEventListener('pause', () => this.onState({ playing: false, loading: false }));
     this.audio.addEventListener('waiting', () => this.onState({ playing: !this.audio.paused, loading: true }));
     this.audio.addEventListener('canplay', () => this.onState({ playing: !this.audio.paused, loading: false }));
@@ -101,8 +109,11 @@ export class Player {
     this.startAt = Number(startAt) || 0;
     if (!same) {
       this.audio.pause();
-      this.audio.src = this.resolveSource(track);
+      const memory = this._memoryUrl(track);
+      this.audio.src = memory || this.resolveSource(track);
       this.audio.load();
+      this._keepMemory([track, this._neighbour(track)]);
+      if (!memory) this._loadMemory(track);
     }
     this.onTrackChange(track);
     this._updateMetadata();
@@ -141,6 +152,64 @@ export class Player {
   toggle() {
     if (this.audio.paused) this.play();
     else this.pause();
+  }
+
+  // Android throttles the network of a page whose screen is off even when its
+  // media session is active: a Range stream then stalls and the music stops
+  // once the buffer runs out. Whole files are therefore kept in memory (the
+  // current and the next track), so playback needs no network while locked.
+  _neighbour(track) {
+    const index = this.queue.findIndex((item) => item.id === track.id);
+    if (index < 0) return null;
+    if (index + 1 < this.queue.length) return this.queue[index + 1];
+    return this.repeat === 'all' ? this.queue[0] || null : null;
+  }
+
+  _memoryUrl(track) {
+    const entry = track && this.memory.get(track.id);
+    return entry && entry.url ? entry.url : '';
+  }
+
+  _keepMemory(tracks) {
+    const keep = new Set(tracks.filter(Boolean).map((track) => track.id));
+    for (const [id, entry] of this.memory) {
+      if (keep.has(id)) continue;
+      if (entry.controller) entry.controller.abort();
+      if (entry.url) URL.revokeObjectURL(entry.url);
+      this.memory.delete(id);
+    }
+  }
+
+  _loadMemory(track) {
+    if (!track || !this.loadBlob || this.memory.has(track.id)) return;
+    const controller = new AbortController();
+    const entry = { controller, url: '' };
+    this.memory.set(track.id, entry);
+    this.loadBlob(track, controller.signal).then((blob) => {
+      if (this.memory.get(track.id) !== entry || !blob) return;
+      entry.controller = null;
+      entry.url = URL.createObjectURL(blob);
+      if (this.track && this.track.id === track.id) this._swapToMemory(entry.url);
+    }).catch(() => {
+      if (this.memory.get(track.id) === entry) this.memory.delete(track.id);
+    });
+  }
+
+  _swapToMemory(url) {
+    if (this.audio.src === url) return;
+    const position = this.audio.currentTime || this.startAt;
+    const playing = !this.audio.paused;
+    this.startAt = position;
+    this.audio.src = url;
+    this.audio.load();
+    if (playing) this.play();
+  }
+
+  _prefetchNext() {
+    if (!this.track) return;
+    const next = this._neighbour(this.track);
+    this._keepMemory([this.track, next]);
+    if (next) this._loadMemory(next);
   }
 
   next({ manual = true } = {}) {
