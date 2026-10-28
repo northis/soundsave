@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,16 +16,34 @@ from soundsave.web.app import create_app
 from .web_helpers import make_config, make_library, make_mp3
 
 
-def make_client(root: Path) -> TestClient:
+def make_client(
+    root: Path,
+    *,
+    main: str = 'Main',
+    yandex_token: str | None = None,
+    playlist_url: str | None = None,
+) -> TestClient:
     make_library(root)
-    return TestClient(create_app(make_config(root)))
+    return TestClient(
+        create_app(
+            make_config(
+                root,
+                main=main,
+                yandex_token=yandex_token,
+                playlist_url=playlist_url,
+            )
+        )
+    )
 
 
 def test_playlists_and_tracks(root: Path) -> None:
     with make_client(root) as client:
         response = client.get('/api/playlists')
         assert response.status_code == 200
-        playlists = response.json()['playlists']
+        data = response.json()
+        assert data['main_playlist'] == 'Main'
+        assert data['sync_available'] is False
+        playlists = data['playlists']
         assert [playlist['name'] for playlist in playlists] == ['Main', 'Chill']
         main = playlists[0]
         assert main['syncable'] is True
@@ -40,6 +60,72 @@ def test_playlists_and_tracks(root: Path) -> None:
         assert track['has_cover'] is True
         assert track['cover_url'].startswith('/api/playlists/')
         assert track['audio_url'].endswith(f'v={track["etag"]}')
+
+
+def test_library_folder_is_the_main_playlist(root: Path) -> None:
+    make_library(root)
+    (root / 'music' / 'Main').rename(root / 'music' / 'Library')
+    with TestClient(create_app(make_config(root, main='Library'))) as client:
+        data = client.get('/api/playlists').json()
+        assert data['main_playlist'] == 'Library'
+        library = next(playlist for playlist in data['playlists'] if playlist['name'] == 'Library')
+        chill = next(playlist for playlist in data['playlists'] if playlist['name'] == 'Chill')
+        assert library['syncable'] is True
+        assert library['readonly'] is False
+        assert chill['syncable'] is False
+        assert chill['readonly'] is True
+
+
+def test_sync_available_reflects_yandex_credentials(root: Path) -> None:
+    with make_client(root, yandex_token='token', playlist_url='https://music.yandex.ru/x') as client:
+        data = client.get('/api/playlists').json()
+        assert data['sync_available'] is True
+        assert all(playlist['sync_available'] is True for playlist in data['playlists'])
+
+
+def test_sync_job_runs_for_the_main_playlist(root: Path, monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    class Result:
+        total_new = 3
+        added = 2
+        failed = 0
+        limit_reached = False
+
+    def fake_run_sync(config, *, allow_zvuk, progress):
+        calls['allow_zvuk'] = allow_zvuk
+        progress(
+            SimpleNamespace(
+                phase='downloading',
+                total=3,
+                completed=1,
+                current_artist='Artist',
+                current_title='Title',
+                added=1,
+                failed=0,
+                limit_reached=False,
+            )
+        )
+        return Result()
+
+    monkeypatch.setattr('soundsave.web.sync_jobs.run_sync', fake_run_sync)
+    with make_client(root, yandex_token='token', playlist_url='https://music.yandex.ru/x') as client:
+        main = next(playlist for playlist in client.get('/api/playlists').json()['playlists'] if playlist['syncable'])
+        response = client.post(
+            f'/api/playlists/{main["id"]}/sync',
+            headers={'X-Soundsave-Request': '1'},
+        )
+        assert response.status_code == 202
+        job = response.json()
+        for _ in range(200):
+            if job['state'] != 'running':
+                break
+            time.sleep(0.01)
+            job = client.get(f'/api/playlists/{main["id"]}/sync').json()
+        assert job['state'] == 'done'
+        assert job['added'] == 2
+        assert job['limit_reached'] is False
+        assert calls['allow_zvuk'] is False
 
 
 def test_audio_range_head_and_download(root: Path) -> None:
@@ -184,4 +270,4 @@ def test_pwa_assets_are_served(root: Path) -> None:
 
         favicon = client.get('/favicon.ico', follow_redirects=False)
         assert favicon.status_code in {307, 308}
-        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.8')
+        assert favicon.headers['location'].endswith('/static/favicon.svg?v=2.1.9')

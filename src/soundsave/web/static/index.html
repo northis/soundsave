@@ -18,10 +18,10 @@
       if (meta) meta.content = dark ? '#18181b' : '#f4f4f5';
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=2.1.8">
-  <link rel="manifest" href="/manifest.webmanifest?v=2.1.8">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2.1.8">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png?v=2.1.8">
+  <link rel="stylesheet" href="/static/style.css?v=2.1.9">
+  <link rel="manifest" href="/manifest.webmanifest?v=2.1.9">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2.1.9">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png?v=2.1.9">
 </head>
 <body>
 <svg width="0" height="0" class="svg-sprite" aria-hidden="true">
@@ -192,6 +192,8 @@
       </select>
     </label>
     <div class="cache-line"><span>Занято</span><span id="cache-usage">—</span></div>
+    <div class="cache-line"><span>Основная папка</span><span id="main-playlist">—</span></div>
+    <div class="cache-line"><span>Синхронизация</span><span id="sync-state">—</span></div>
     <div class="settings-actions">
       <button id="clear-cache" class="btn" type="button">Очистить кэш</button>
       <button id="install-btn" class="btn primary" type="button" hidden>Установить приложение</button>
@@ -215,6 +217,6 @@
 </dialog>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script type="module" src="/static/app.js?v=2.1.8"></script>
+<script type="module" src="/static/app.js?v=2.1.9"></script>
 </body>
 </html>

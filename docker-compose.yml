@@ -20,6 +20,8 @@ services:
       DATA_DIR: /app/data
       PLAYLIST_URL: "${PLAYLIST_URL:-}"
       YANDEX_TOKEN: "${YANDEX_TOKEN:-}"
+      # The CLI accepts API_KEY as an alias; pass it through for older .env files.
+      API_KEY: "${API_KEY:-}"
       MAX_DOWNLOADS: "${MAX_DOWNLOADS:-20}"
       SOUNDSAVE_DELAY: "${SOUNDSAVE_DELAY:-1.0}"
     volumes:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
@@ -84,6 +84,23 @@ def _track_json(playlist_id: int, track: TrackRow) -> dict[str, object]:
     }
 
 
+def _warn_if_main_folder_is_new(settings: WebSettings) -> None:
+    """Point at the likely misconfiguration when MAIN_PLAYLIST creates a folder."""
+    if not settings.is_multi_playlist or settings.target_dir.exists():
+        return
+    existing: list[str] = []
+    with suppress(OSError):
+        existing = sorted(
+            entry.name for entry in settings.music_dir.iterdir() if entry.is_dir() and not entry.name.startswith('.')
+        )
+    logger.warning(
+        'Main playlist folder %r does not exist and will be created. '
+        'Set MAIN_PLAYLIST to the folder that should be synced%s.',
+        settings.target_dir.name,
+        f' (existing folders: {", ".join(existing)})' if existing else '',
+    )
+
+
 def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
     """Build the app; the caller may pass explicit settings in tests."""
     resolved = settings or WebSettings.from_config(config)
@@ -95,9 +112,16 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        _warn_if_main_folder_is_new(resolved)
         resolved.ensure()
         store.init()
         scanner.reconcile()
+        logger.info(
+            'Web library: music=%s, main playlist=%r, sync=%s',
+            resolved.music_dir,
+            resolved.main_playlist_name,
+            'configured' if sync_available else 'not configured (set YANDEX_TOKEN or API_KEY and PLAYLIST_URL)',
+        )
         app.state.settings = resolved
         app.state.store = store
         app.state.scanner = scanner
@@ -119,7 +143,7 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
 
     @app.get('/favicon.ico')
     def favicon() -> RedirectResponse:
-        return RedirectResponse('/static/favicon.svg?v=2.1.8')
+        return RedirectResponse('/static/favicon.svg?v=2.1.9')
 
     @app.get('/manifest.webmanifest')
     def manifest() -> FileResponse:
@@ -151,7 +175,11 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
     def playlists() -> JSONResponse:
         rows = store.list_playlists()
         return JSONResponse(
-            {'playlists': [_playlist_json(row, sync_available=sync_available) for row in rows]},
+            {
+                'playlists': [_playlist_json(row, sync_available=sync_available) for row in rows],
+                'main_playlist': resolved.main_playlist_name,
+                'sync_available': sync_available,
+            },
             headers={'Cache-Control': 'no-store'},
         )
 

@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.1.8';
-import { CacheManager, formatBytes } from './cache.js?v=2.1.8';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.1.8';
+import { Player } from './player.js?v=2.1.9';
+import { CacheManager, formatBytes } from './cache.js?v=2.1.9';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.1.9';
 
-const APP_VERSION = '2.1.8';
+const APP_VERSION = '2.1.9';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -156,6 +156,16 @@ function currentPlaylist() {
   return state.playlists.find((playlist) => playlist.id === state.playlistId) || null;
 }
 
+function renderMainPlaylist(data) {
+  const main = $('main-playlist');
+  const stateLabel = $('sync-state');
+  if (main) main.textContent = data.main_playlist || '—';
+  if (!stateLabel) return;
+  const ready = Boolean(data.sync_available);
+  stateLabel.textContent = ready ? 'настроена' : 'не настроена';
+  stateLabel.title = ready ? '' : 'Задайте YANDEX_TOKEN (или API_KEY) и PLAYLIST_URL в .env';
+}
+
 function updateSyncButton() {
   const playlist = currentPlaylist();
   const button = $('sync-btn');
@@ -164,13 +174,14 @@ function updateSyncButton() {
   if (!visible) return;
   const available = Boolean(playlist.sync_available);
   button.disabled = !available || Boolean(state.syncTimer);
-  button.title = available ? 'Скачать новые треки из Яндекса' : 'Задайте YANDEX_TOKEN и PLAYLIST_URL в .env';
+  button.title = available ? 'Скачать новые треки из Яндекса' : 'Задайте YANDEX_TOKEN (или API_KEY) и PLAYLIST_URL в .env';
   button.querySelector('.sync-label').textContent = available ? 'Синхронизировать' : 'Sync недоступен';
 }
 
 async function loadPlaylists({ preserveSelection = false } = {}) {
   const data = await api('/api/playlists');
   state.playlists = data.playlists || [];
+  renderMainPlaylist(data);
   if (!state.playlists.length) {
     state.playlistId = null;
     state.tracks = [];

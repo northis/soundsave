@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.9] - 2026-10-29
+
+### Fixed
+
+- Cover preview text is always light: the dimmed backdrop stays dark in both
+  themes, so the title no longer disappears on the light theme.
+
+### Added
+
+- Settings shows the main playlist folder and whether Yandex sync is
+  configured, so it is clear which folder gets the sync button.
+- The server log prints the resolved library layout at startup and warns when
+  `MAIN_PLAYLIST` points to a folder that does not exist and had to be created.
+
+### Changed
+
+- `docker-compose.yml` passes `API_KEY` to the container as well, so older
+  `.env` files that use the CLI alias keep web sync enabled.
+
 ## [2.1.8] - 2026-10-29
 
 ### Added

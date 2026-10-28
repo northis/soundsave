@@ -270,6 +270,12 @@ serves 192 kbps, the archive gets 192 kbps. The CLI `soundsave sync` keeps its
 Zvuk fallback; the web image does not include `ffmpeg` and does not need
 `ZVUK_TOKEN`.
 
+`MAIN_PLAYLIST` must match the folder name exactly: `Library` and `library`
+are different folders on Linux. Settings shows the resolved main folder and
+whether Yandex sync is configured, and the same line is written to the
+container log at startup. Docker Compose passes both `YANDEX_TOKEN` and the
+older `API_KEY` alias.
+
 The player:
 
 * streams files with HTTP Range, so seeking and fast starts work;
