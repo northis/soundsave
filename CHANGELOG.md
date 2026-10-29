@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-10-29
+
+### Changed
+
+- The seek bar is horizontal again and spans the full player width under the
+  controls, from the track info to the volume block, so seeking is precise. It
+  still has no white outline around the thumb, and only the thumb shows the
+  playback position.
+- The cached/downloaded part is a pale blue fill that stays at 100% once the
+  track is fully downloaded.
+
 ## [2.2.0] - 2026-10-29
 
 ### Added
@@ -22,9 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- The seek bar is vertical and has no white outline around the thumb. The
-  played part is no longer filled; only the thumb shows the position, and the
-  cache/download progress is a pale blue fill.
+- The seek bar is horizontal again, spans the full player width under the
+  controls, and has no white outline around the thumb. The played part is not
+  filled; only the thumb shows the position. The cached part is a pale blue
+  fill that stays at 100% once the track is downloaded.
 - The album column is much wider, and long titles and album names wrap to two
   lines before being truncated.
 

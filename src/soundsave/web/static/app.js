@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.2.0';
-import { CacheManager, formatBytes } from './cache.js?v=2.2.0';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.2.0';
+import { Player } from './player.js?v=2.2.1';
+import { CacheManager, formatBytes } from './cache.js?v=2.2.1';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.2.1';
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.2.1';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -641,7 +641,7 @@ function updatePlayerTrack(track) {
     $('play-btn').disabled = true;
     $('prev-btn').disabled = true;
     $('next-btn').disabled = true;
-    $('seek-cached').style.height = '0%';
+    $('seek-cached').style.width = '0%';
     updateSeek(0, 0);
     return;
   }
@@ -665,12 +665,18 @@ function updatePlayerCache(track) {
   button.hidden = false;
   updateCacheIndicator(button, track);
   const status = cacheManager ? cacheManager.state(track) : { status: 'none', progress: 0 };
-  $('seek-cached').style.height = status.status === 'caching' ? `${(status.progress || 0) * 100}%` : '0%';
+  if (status.status === 'cached') {
+    $('seek-cached').style.width = '100%';
+  } else if (status.status === 'caching') {
+    $('seek-cached').style.width = `${(status.progress || 0) * 100}%`;
+  } else {
+    $('seek-cached').style.width = '0%';
+  }
 }
 
 function updateSeek(current, duration) {
   const progress = duration ? Math.min(1, current / duration) : 0;
-  $('seek-thumb').style.bottom = `${progress * 100}%`;
+  $('seek-thumb').style.left = `${progress * 100}%`;
   $('time-current').textContent = formatTime(current);
   $('time-total').textContent = formatTime(duration);
   const seek = $('seek');
@@ -681,7 +687,7 @@ function updateSeek(current, duration) {
 
 function updateCacheProgress(track, progress) {
   if (!track || track.id !== state.currentId) return;
-  $('seek-cached').style.height = `${Math.max(0, Math.min(1, progress)) * 100}%`;
+  $('seek-cached').style.width = `${Math.max(0, Math.min(1, progress)) * 100}%`;
   const row = document.querySelector(`.track-row[data-id="${track.id}"] .cache-indicator`);
   if (row) updateCacheIndicator(row, track);
 }
@@ -1049,7 +1055,7 @@ function setupSeek() {
   const seek = $('seek');
   const ratio = (event) => {
     const rect = seek.getBoundingClientRect();
-    return Math.max(0, Math.min(1, 1 - (event.clientY - rect.top) / rect.height));
+    return Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
   };
   seek.addEventListener('pointerdown', (event) => {
     if (!player.duration) return;

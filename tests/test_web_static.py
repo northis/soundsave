@@ -57,12 +57,12 @@ def test_index_has_theme_boot_script_and_pwa_links() -> None:
     assert '/static/app.js' in index
 
 
-def test_player_has_vertical_seek_shuffle_and_tooltips() -> None:
+def test_player_has_full_width_seek_shuffle_and_tooltips() -> None:
     index = (STATIC / 'index.html').read_text(encoding='utf-8')
     style = (STATIC / 'style.css').read_text(encoding='utf-8')
     app = (STATIC / 'app.js').read_text(encoding='utf-8')
 
-    assert 'aria-orientation="vertical"' in index
+    assert 'aria-orientation' not in index
     assert 'seek-played' not in index
     assert 'seek-played' not in style
     assert 'shuffle-btn' in index
@@ -75,7 +75,10 @@ def test_player_has_vertical_seek_shuffle_and_tooltips() -> None:
     assert 'box-shadow: 0 0 0 2px var(--panel)' not in style
     assert '-webkit-line-clamp: 2' in style
     assert '.tooltip' in style
-    assert 'event.clientY' in app
+    assert 'event.clientX' in app
+    assert "status.status === 'cached'" in app
+    assert "style.width = '100%'" in app
+    assert 'grid-template-areas:\n    "track controls extra"\n    "seek seek seek"' in style
 
 
 def test_service_worker_caches_shell_and_audio() -> None:
@@ -83,7 +86,7 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v12' in worker
+    assert 'soundsave-shell-v13' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker

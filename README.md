@@ -315,8 +315,8 @@ The player:
 
 * streams files with HTTP Range, so seeking and fast starts work;
 * shows embedded covers (resized and cached) or a placeholder;
-* supports play/pause, previous/next, a vertical seek slider, shuffle within
-  the current playlist, repeat off/all/one and volume;
+* supports play/pause, previous/next, a full-width horizontal seek bar, shuffle
+  within the current playlist, repeat off/all/one and volume;
 * sorts by playlist number, title or artist and keeps the playing track in the
   centre unless you have scrolled away;
 * uses roomier table columns, wraps the album and title to two lines and shows
@@ -330,8 +330,9 @@ The player:
 
 The PWA caches the app shell, API metadata and covers. Playing a track also
 downloads it into the local Cache API (progress is shown as a pale blue fill on
-the vertical seek slider), and cached tracks are marked with a check. The
-position in the track is shown only by the slider thumb. The cache uses
+the seek bar and stays full once the track is cached), and cached tracks are
+marked with a check. The position in the track is shown only by the slider
+thumb. The cache uses
 IndexedDB for its LRU index, defaults to 2 GB and can be cleared in Settings.
 This is client-side storage; the server keeps the original files.
 

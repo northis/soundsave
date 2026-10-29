@@ -18,7 +18,7 @@
       if (meta) meta.content = dark ? '#18181b' : '#f4f4f5';
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=2.2.0">
+  <link rel="stylesheet" href="/static/style.css?v=2.2.1">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png">
@@ -146,11 +146,12 @@
       </button>
     </div>
     <div class="seek-wrap">
-      <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Позиция воспроизведения" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span class="time" id="time-current">0:00</span>
+      <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Позиция воспроизведения" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <span class="seek-cached" id="seek-cached"></span>
         <span class="seek-thumb" id="seek-thumb"></span>
       </div>
-      <div class="time"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+      <span class="time" id="time-total">0:00</span>
     </div>
     <div class="player-extra" id="player-extra">
       <button id="mute-btn" class="icon-btn" type="button" title="Звук" aria-label="Звук">
@@ -220,6 +221,6 @@
 </dialog>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script type="module" src="/static/app.js?v=2.2.0"></script>
+<script type="module" src="/static/app.js?v=2.2.1"></script>
 </body>
 </html>

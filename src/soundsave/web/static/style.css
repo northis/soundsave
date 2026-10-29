@@ -333,15 +333,18 @@ button { cursor: pointer; }
 
 .player {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto minmax(120px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) auto minmax(120px, 1fr);
+  grid-template-areas:
+    "track controls extra"
+    "seek seek seek";
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  gap: 8px 12px;
+  padding: 7px 12px calc(7px + env(safe-area-inset-bottom));
   background: var(--panel);
   border-top: 1px solid var(--border);
-  min-height: 64px;
+  min-height: 72px;
 }
-.player-track { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.player-track { grid-area: track; display: flex; align-items: center; gap: 9px; min-width: 0; }
 .player-cover {
   width: 42px; height: 42px; border-radius: 4px; overflow: hidden; flex: 0 0 auto;
   background: linear-gradient(135deg, var(--border), var(--panel-2));
@@ -359,7 +362,7 @@ button { cursor: pointer; }
 .cache-btn.is-caching { color: var(--accent); opacity: .75; }
 .cache-btn.is-error { color: var(--danger); }
 .cache-btn.is-caching .icon { animation: spin 1.4s linear infinite; }
-.player-controls { display: flex; align-items: center; gap: 4px; }
+.player-controls { grid-area: controls; display: flex; align-items: center; gap: 4px; justify-self: center; }
 .play-btn {
   width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%;
   background: var(--accent); color: #fff; padding: 0;
@@ -376,25 +379,25 @@ button { cursor: pointer; }
 .shuffle-btn[data-active="true"] { color: var(--accent); }
 .shuffle-btn[data-active="true"]:hover { color: var(--accent); }
 
-.seek-wrap { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 9px; }
+.seek-wrap { grid-area: seek; min-width: 0; display: flex; align-items: center; gap: 8px; }
 .seek {
-  position: relative; width: 6px; height: 46px; border-radius: 999px; background: var(--track);
-  cursor: pointer; touch-action: none; outline: none; flex: 0 0 auto;
+  position: relative; flex: 1; min-width: 0; height: 6px; border-radius: 999px; background: var(--track);
+  cursor: pointer; touch-action: none; outline: none;
 }
+.seek::before { content: ""; position: absolute; inset: -5px 0; }
 .seek:focus-visible { box-shadow: 0 0 0 2px var(--accent-soft); }
 .seek-cached {
-  position: absolute; inset: auto 0 0 0; height: 0; border-radius: 999px;
+  position: absolute; inset: 0 auto 0 0; width: 0; height: 100%; border-radius: 999px;
   background: var(--cache); z-index: 1; pointer-events: none;
 }
 .seek-thumb {
-  position: absolute; left: 50%; bottom: 0; width: 12px; height: 12px; border-radius: 50%;
-  background: var(--accent); transform: translate(-50%, 50%); z-index: 4; pointer-events: none;
+  position: absolute; left: 0; top: 50%; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
 }
-.time {
-  display: flex; flex-direction: column; justify-content: space-between; height: 46px;
-  color: var(--muted); font-size: 9.5px; font-variant-numeric: tabular-nums;
-}
-.player-extra { display: flex; align-items: center; gap: 4px; color: var(--muted); justify-self: end; }
+.time { flex: 0 0 auto; min-width: 34px; color: var(--muted); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+#time-current { text-align: right; }
+#time-total { text-align: left; }
+.player-extra { grid-area: extra; display: flex; align-items: center; gap: 4px; color: var(--muted); justify-self: end; }
 .player-extra .mute-icon { display: none; }
 .player-extra.is-muted .volume-icon { display: none; }
 .player-extra.is-muted .mute-icon { display: inline-block; }
@@ -521,7 +524,7 @@ button { cursor: pointer; }
   .cache-indicator { width: 28px; height: 28px; }
   .player {
     grid-template-columns: 1fr;
-    grid-template-areas: "track" "seek" "controls";
+    grid-template-areas: "track" "controls" "seek";
     gap: 6px;
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
     min-height: 0;
