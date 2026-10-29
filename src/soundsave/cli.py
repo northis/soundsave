@@ -86,6 +86,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     tags_parser = subparsers.add_parser('tags', help='check and fill missing tags, covers and lyrics')
     _add_scan_arguments(tags_parser)
+    tags_parser.add_argument(
+        '--playlist',
+        metavar='NAME',
+        help='check a playlist folder under MUSIC_DIR instead of TARGET_DIR',
+    )
     tags_parser.add_argument('--apply', action='store_true', help='write missing values into existing files')
     tags_parser.add_argument(
         '--source',
@@ -144,10 +149,38 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _playlist_dir(config: Config, name: str) -> Path:
+    """Resolve a ``--playlist`` folder name to an existing playlist directory.
+
+    With ``MUSIC_DIR`` configured the name is resolved against it, the same way
+    the web player treats immediate subfolders as playlists. Without a separate
+    library root the parent of ``TARGET_DIR`` is used, so sibling playlist
+    folders can be checked in the legacy flat layout too.
+    """
+    if not name or Path(name).name != name or name in {'.', '..'}:
+        raise ConfigError(f'--playlist must be a single folder name, got {name!r}')
+    music_dir = (config.music_dir or config.target_dir).expanduser()
+    target_dir = config.target_dir.expanduser()
+    if not config.music_dir_configured and music_dir.resolve() == target_dir.resolve():
+        music_dir = target_dir.parent
+    path = music_dir / name
+    try:
+        path.resolve().relative_to(music_dir.resolve())
+    except ValueError as exc:
+        raise ConfigError(f'--playlist must stay inside {music_dir}: {name!r}') from exc
+    if not path.is_dir():
+        raise ConfigError(f'Playlist folder does not exist: {path}')
+    return path
+
+
 def _override_config(config: Config, args: argparse.Namespace) -> Config:
     overrides: dict[str, object] = {}
     if getattr(args, 'target_dir', None) is not None:
         overrides['target_dir'] = Path(args.target_dir).expanduser()
+    if getattr(args, 'playlist', None) is not None:
+        if getattr(args, 'target_dir', None) is not None:
+            raise ConfigError('--playlist cannot be combined with --dir')
+        overrides['target_dir'] = _playlist_dir(config, args.playlist)
     if getattr(args, 'min_score', None) is not None:
         overrides['min_score'] = args.min_score
     if getattr(args, 'duration_tolerance', None) is not None:

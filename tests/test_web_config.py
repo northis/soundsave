@@ -21,6 +21,7 @@ def test_music_dir_and_main_playlist_derive_target(
     config = Config.load(empty)
 
     assert config.music_dir == tmp_path / 'music'
+    assert config.music_dir_configured is True
     assert config.target_dir == tmp_path / 'music' / 'Main'
     assert config.data_dir == tmp_path / 'data'
 
@@ -38,6 +39,7 @@ def test_legacy_target_dir_is_a_flat_library(
     config = Config.load(empty)
 
     assert config.music_dir == tmp_path / 'library'
+    assert config.music_dir_configured is False
     assert config.target_dir == tmp_path / 'library'
 
 

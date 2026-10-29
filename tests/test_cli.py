@@ -17,12 +17,17 @@ def make_config(
     yandex_token: str | None = None,
     discogs_token: str | None = None,
     discogs_delay: float = 2.0,
+    music_dir: Path | None = None,
+    target_dir: Path | None = None,
+    music_dir_configured: bool = False,
 ) -> Config:
     return Config(
         yandex_token=yandex_token,
         zvuk_token=None,
         playlist_url=None,
-        target_dir=tmp_path,
+        target_dir=target_dir or tmp_path,
+        music_dir=music_dir,
+        music_dir_configured=music_dir_configured,
         delay=0.0,
         discogs_token=discogs_token,
         discogs_delay=discogs_delay,
@@ -87,6 +92,7 @@ class TestTagsParser:
         assert args.discogs_delay is None
         assert args.limit is None
         assert args.file_id is None
+        assert args.playlist is None
 
     def test_flags(self) -> None:
         args = build_parser().parse_args(
@@ -104,6 +110,8 @@ class TestTagsParser:
                 '42',
                 '--limit',
                 '10',
+                '--playlist',
+                'Chill',
             ],
         )
 
@@ -115,6 +123,7 @@ class TestTagsParser:
         assert args.discogs_delay == 5.0
         assert args.file_id == 42
         assert args.limit == 10
+        assert args.playlist == 'Chill'
 
 
 class FakeDiscogsCatalog:
@@ -151,6 +160,95 @@ class TestTagsDispatch:
         assert options.apply is True
         assert options.search is False
         assert options.lyrics is False
+
+    def test_playlist_uses_music_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        music = tmp_path / 'music'
+        library = music / 'Library'
+        chill = music / 'Chill'
+        library.mkdir(parents=True)
+        chill.mkdir()
+        config = make_config(tmp_path, yandex_token='token', music_dir=music, target_dir=library)
+        captured: dict[str, Path] = {}
+
+        def fake_run_tags(config: Config, catalog: object, options: object) -> list[object]:
+            captured['target_dir'] = config.target_dir
+            return []
+
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+        monkeypatch.setattr('soundsave.cli.YandexCatalog.load', lambda *_: object())
+        monkeypatch.setattr('soundsave.cli.run_tags', fake_run_tags)
+
+        assert main(['tags', '--playlist', 'Chill']) == 0
+        assert captured['target_dir'] == chill
+
+    def test_playlist_uses_music_dir_in_flat_layout(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        music = tmp_path / 'music'
+        chill = music / 'Chill'
+        chill.mkdir(parents=True)
+        config = make_config(
+            tmp_path,
+            yandex_token='token',
+            music_dir=music,
+            target_dir=music,
+            music_dir_configured=True,
+        )
+        captured: dict[str, Path] = {}
+
+        def fake_run_tags(config: Config, catalog: object, options: object) -> list[object]:
+            captured['target_dir'] = config.target_dir
+            return []
+
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+        monkeypatch.setattr('soundsave.cli.YandexCatalog.load', lambda *_: object())
+        monkeypatch.setattr('soundsave.cli.run_tags', fake_run_tags)
+
+        assert main(['tags', '--playlist', 'Chill']) == 0
+        assert captured['target_dir'] == chill
+
+    def test_playlist_uses_target_parent_without_music_dir(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        library = tmp_path / 'Library'
+        chill = tmp_path / 'Chill'
+        library.mkdir()
+        chill.mkdir()
+        config = make_config(tmp_path, yandex_token='token', target_dir=library)
+        captured: dict[str, Path] = {}
+
+        def fake_run_tags(config: Config, catalog: object, options: object) -> list[object]:
+            captured['target_dir'] = config.target_dir
+            return []
+
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+        monkeypatch.setattr('soundsave.cli.YandexCatalog.load', lambda *_: object())
+        monkeypatch.setattr('soundsave.cli.run_tags', fake_run_tags)
+
+        assert main(['tags', '--playlist', 'Chill']) == 0
+        assert captured['target_dir'] == chill
+
+    def test_playlist_rejects_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        config = make_config(tmp_path, yandex_token='token')
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+
+        assert main(['tags', '--playlist', 'Chill', '--dir', str(tmp_path)]) == 1
+
+    def test_playlist_rejects_nested_name(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        config = make_config(tmp_path, yandex_token='token')
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+
+        assert main(['tags', '--playlist', '../Chill']) == 1
+
+    def test_playlist_rejects_missing_folder(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        config = make_config(tmp_path, yandex_token='token', music_dir=tmp_path, target_dir=tmp_path / 'Library')
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+
+        assert main(['tags', '--playlist', 'Chill']) == 1
 
     def test_missing_token_returns_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         config = make_config(tmp_path, yandex_token=None)

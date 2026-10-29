@@ -120,6 +120,10 @@ soundsave tags --limit 100 --csv tags.csv --json tags.json
 # Fill only missing values in the existing files
 soundsave tags --apply
 
+# Check another playlist folder instead of TARGET_DIR
+soundsave tags --playlist Chill
+soundsave tags --playlist Chill --apply
+
 # Discogs only (e.g. after Yandex has already been applied)
 soundsave tags --source discogs --apply
 
@@ -190,6 +194,12 @@ for `WOAF`.
 `--no-search` skips catalogue search and uses only the Yandex playlist;
 `--no-lyrics` skips lyrics. Yandex text lyrics are not available for every
 track; those files are reported as `lyrics: unavailable`.
+
+By default `tags` scans `TARGET_DIR`, the main playlist. `--playlist NAME`
+checks another immediate subfolder of `MUSIC_DIR` and can be combined with
+`--apply` to fill its missing tags and covers. Without a separate `MUSIC_DIR`
+the folder is resolved next to `TARGET_DIR`, which matches the legacy flat
+layout. `--playlist` cannot be combined with `--dir`.
 
 ### Exporting a playlist for a container
 

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-29
+
+### Added
+
+- `soundsave tags --playlist NAME` checks and, with `--apply`, fills missing
+  tags, covers and lyrics in another playlist folder instead of `TARGET_DIR`.
+  The name is resolved against `MUSIC_DIR`, or next to `TARGET_DIR` when
+  `MUSIC_DIR` is not configured. It cannot be combined with `--dir`.
+
 ## [2.2.1] - 2026-10-29
 
 ### Changed

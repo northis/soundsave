@@ -204,11 +204,17 @@ soundsave tags --apply                  # вшить только отсутст
 soundsave tags --apply --no-lyrics      # без лирики, только теги и обложка
 soundsave tags --no-search              # только плейлист, без поиска
 soundsave tags --id 42 --limit 100 --csv tags.csv --json tags.json
+soundsave tags --playlist Chill         # проверить другой плейлист
+soundsave tags --playlist Chill --apply # заполнить пропуски в другом плейлисте
 ```
 
 Аргументы:
 
 * `--dir`, `--limit`, `--id` — общие аргументы сканирования архива.
+* `--playlist NAME` — проверить папку-плейлист `NAME` (непосредственную
+  подпапку `MUSIC_DIR`) вместо `TARGET_DIR`. Без отдельного `MUSIC_DIR` папка
+  ищется рядом с `TARGET_DIR`. Несовместим с `--dir`. `--apply` пишет в
+  выбранную папку, а временные файлы создаются в её `.soundsave/tmp/`.
 * `--min-score`, `--duration-tolerance` — пороги для поиска по каталогу.
 * `--delay` — пауза между поисковыми запросами.
 * `--csv`, `--json` — отчёты.
@@ -257,7 +263,8 @@ soundsave tags --id 42 --limit 100 --csv tags.csv --json tags.json
 | `src/soundsave/archive.py` | публичный `update_tag_data`, перенос `get_image_type` |
 | `src/soundsave/report.py` | обобщённые `write_csv`/`write_json` |
 | `src/soundsave/config.py` | `DISCOGS_TOKEN`, `DISCOGS_DELAY` |
-| `src/soundsave/cli.py` | subparser `tags`, `--apply`/`--no-search`/`--no-lyrics`, `--source`, `--discogs-delay` |
+| `src/soundsave/cli.py` | subparser `tags`, `--playlist`, `--apply`/`--no-search`/`--no-lyrics`, `--source`, `--discogs-delay` |
+| `src/soundsave/config.py` | `music_dir_configured` for `--playlist` resolution |
 | `src/soundsave/sync.py` | импорт `full_title`/`parse_playlist_url`/`get_image_type` из `archive.py` и `yandex_catalog.py` |
 | `tests/test_tags.py` | матчинг, diff, политика «только пустые», запись |
 | `tests/test_yandex_catalog.py` | плейлист, batch, search, ошибки |

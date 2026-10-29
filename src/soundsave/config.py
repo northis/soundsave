@@ -69,6 +69,7 @@ class Config:
     delay: float = 1.0
     discogs_token: str | None = None
     discogs_delay: float = 2.0
+    music_dir_configured: bool = False
 
     @classmethod
     def load(cls, env_file: str | Path | None = None) -> Config:
@@ -142,6 +143,7 @@ class Config:
             playlist_url=_env('PLAYLIST_URL'),
             target_dir=target_dir,
             music_dir=music_dir,
+            music_dir_configured=music_raw is not None,
             main_playlist=main_playlist,
             data_dir=data_dir,
             web_host=_env('SOUNDSAVE_HOST', default='127.0.0.1') or '127.0.0.1',
