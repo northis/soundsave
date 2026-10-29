@@ -209,7 +209,10 @@ checks another immediate subfolder of `MUSIC_DIR` and can be combined with
 `--apply` to fill its missing tags and covers. Without a separate `MUSIC_DIR`
 the folder is resolved next to `TARGET_DIR`, which matches the legacy flat
 layout. `--playlist` cannot be combined with `--dir`. Use `--folder PATH`
-(an alias of `--dir`) to point at any folder explicitly.
+(an alias of `--dir`) to point at any folder explicitly. An explicit
+`--folder`/`--dir`/`--playlist` takes precedence over the default
+`TARGET_DIR`/`MUSIC_DIR` relationship, so a stale default target does not
+block the run.
 
 ### Exporting a playlist for a container
 

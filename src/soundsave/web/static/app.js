@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.4.0';
-import { CacheManager, formatBytes } from './cache.js?v=2.4.0';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.4.0';
+import { Player } from './player.js?v=2.4.1';
+import { CacheManager, formatBytes } from './cache.js?v=2.4.1';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.4.1';
 
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });

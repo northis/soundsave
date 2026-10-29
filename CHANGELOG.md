@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-10-30
+
+### Fixed
+
+- `soundsave tags --folder`, `--dir` and `--playlist` no longer fail with
+  `TARGET_DIR must be inside MUSIC_DIR` when the configured default target is
+  stale or points outside `MUSIC_DIR`: an explicit folder now takes precedence.
+  When the default target is actually used, the error message includes both
+  paths.
+
 ## [2.4.0] - 2026-10-30
 
 ### Added

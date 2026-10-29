@@ -429,7 +429,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == 'export':
             return _run_export(args)
-        config = _override_config(Config.load(args.env_file), args)
+        # An explicit --dir/--folder/--playlist makes the configured
+        # TARGET_DIR irrelevant, so do not reject a stale default target.
+        explicit_target = getattr(args, 'target_dir', None) is not None or getattr(args, 'playlist', None) is not None
+        loaded = Config.load(args.env_file, validate_target=False) if explicit_target else Config.load(args.env_file)
+        config = _override_config(loaded, args)
         if args.command == 'sync':
             run_sync(config, dry_run=args.dry_run, limit=args.limit)
             return 0

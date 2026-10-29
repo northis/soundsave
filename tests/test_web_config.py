@@ -56,6 +56,21 @@ def test_target_must_be_inside_music_dir(
         Config.load(empty)
 
 
+def test_target_validation_can_be_skipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    empty = tmp_path / 'empty.env'
+    empty.write_text('')
+    monkeypatch.setenv('MUSIC_DIR', str(tmp_path / 'music'))
+    monkeypatch.setenv('TARGET_DIR', str(tmp_path / 'outside'))
+
+    config = Config.load(empty, validate_target=False)
+
+    assert config.music_dir == tmp_path / 'music'
+    assert config.target_dir == tmp_path / 'outside'
+
+
 def test_main_playlist_must_be_a_folder_name(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -72,8 +72,13 @@ class Config:
     music_dir_configured: bool = False
 
     @classmethod
-    def load(cls, env_file: str | Path | None = None) -> Config:
-        """Load settings from *env_file* or the default ``.env`` search path."""
+    def load(cls, env_file: str | Path | None = None, *, validate_target: bool = True) -> Config:
+        """Load settings from *env_file* or the default ``.env`` search path.
+
+        ``validate_target=False`` skips the ``TARGET_DIR``/``MUSIC_DIR``
+        relationship check. Commands that receive an explicit folder on the
+        command line use it: the default target is irrelevant for them.
+        """
         if env_file is not None:
             load_dotenv(env_file, override=True)
         else:
@@ -97,11 +102,13 @@ class Config:
 
         if music_dir is None:
             music_dir = target_dir
-        if music_raw and target_raw:
+        if validate_target and music_raw and target_raw:
             try:
                 target_dir.resolve().relative_to(music_dir.resolve())
             except ValueError as exc:
-                raise ConfigError('TARGET_DIR must be inside MUSIC_DIR') from exc
+                raise ConfigError(
+                    f'TARGET_DIR must be inside MUSIC_DIR: {target_dir} is not under {music_dir}',
+                ) from exc
 
         data_raw = _env('DATA_DIR')
         data_dir = Path(data_raw).expanduser() if data_raw else target_dir / '.soundsave'
