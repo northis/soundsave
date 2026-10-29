@@ -15,6 +15,7 @@ from pathlib import Path
 from mutagen import File as MutagenFile
 
 from .archive import (
+    TAGGABLE_EXTENSIONS,
     ArchiveError,
     TagData,
     has_artists,
@@ -418,7 +419,7 @@ def _process_track(
 def run_tags(config: Config, catalog: MetadataCatalog, options: TagsOptions) -> list[MetadataReportRow]:
     """Check the archive and fill missing values from *catalog*."""
     workspace = config.target_dir / '.soundsave'
-    tracks = scan_archive(config.target_dir, file_id=options.file_id)
+    tracks = scan_archive(config.target_dir, file_id=options.file_id, extensions=TAGGABLE_EXTENSIONS)
     total = len(tracks)
     rows: list[MetadataReportRow] = []
     processed = 0

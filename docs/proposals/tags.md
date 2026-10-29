@@ -57,7 +57,7 @@ Read-only прогон по текущей фонотеке (1648 файлов, 
 * Источник — только Yandex Music (`YANDEX_TOKEN`). `PLAYLIST_URL` используется,
   если задан; без него команда работает в режиме поиска по каталогу.
 * Только метаданные, обложка и лирика. Аудио не скачивается, не перекодируется
-  и не заменяется.
+  и не заменяется. Поддерживаются MP3, FLAC и AAC `.m4a`.
 * Файлы не переименовываются.
 * `--apply` заполняет **только пустые** поля. Существующие значения не
   перезаписываются.
@@ -175,6 +175,11 @@ Read-only прогон по текущей фонотеке (1648 файлов, 
 * **FLAC.** Загрузить `FLAC`, обновить только целевые Vorbis comments.
   Обложка — front cover (`Picture.type == 3`); добавляется только при
   отсутствии, остальные pictures сохраняются.
+* **M4A.** Загрузить `MP4`, обновить только целевые iTunes-атомы (`©nam`,
+  `©ART`, `©alb`, `aART`, `©day`, `©gen`, `©lyr`, `covr`). URL Yandex
+  хранится в freeform-атоме `----:com.apple.iTunes:WOAF`; `trkn`/`disk` не
+  трогаются. Обложка добавляется только если `covr` пуст; существующие
+  обложки и неизвестные атомы сохраняются.
 * **Лирика.** MP3 — `USLT` (как в `sync.set_tags`), FLAC — `lyrics`.
   Добавляется только если `TagData.lyrics` пуст; существующий текст не
   перезаписывается. Наличие проверяется по любому непустому `USLT`/`lyrics`,
@@ -206,15 +211,18 @@ soundsave tags --no-search              # только плейлист, без 
 soundsave tags --id 42 --limit 100 --csv tags.csv --json tags.json
 soundsave tags --playlist Chill         # проверить другой плейлист
 soundsave tags --playlist Chill --apply # заполнить пропуски в другом плейлисте
+soundsave tags --folder "D:\Music\Chill" # явно указать папку (алиас --dir)
 ```
 
 Аргументы:
 
-* `--dir`, `--limit`, `--id` — общие аргументы сканирования архива.
+* `--dir`, `--folder PATH` — явно указать папку для проверки/записи (алиасы).
+* `--limit`, `--id` — общие аргументы сканирования архива.
 * `--playlist NAME` — проверить папку-плейлист `NAME` (непосредственную
   подпапку `MUSIC_DIR`) вместо `TARGET_DIR`. Без отдельного `MUSIC_DIR` папка
-  ищется рядом с `TARGET_DIR`. Несовместим с `--dir`. `--apply` пишет в
-  выбранную папку, а временные файлы создаются в её `.soundsave/tmp/`.
+  ищется рядом с `TARGET_DIR`. Несовместим с `--dir`/`--folder`. `--apply`
+  пишет в выбранную папку, а временные файлы создаются в её
+  `.soundsave/tmp/`.
 * `--min-score`, `--duration-tolerance` — пороги для поиска по каталогу.
 * `--delay` — пауза между поисковыми запросами.
 * `--csv`, `--json` — отчёты.
@@ -260,17 +268,16 @@ soundsave tags --playlist Chill --apply # заполнить пропуски в
 | `src/soundsave/discogs_catalog.py` | Discogs client, throttle, search, release tracklist, cover |
 | `src/soundsave/catalogs.py` | `MetadataCatalog` protocol и `CompositeCatalog` |
 | `src/soundsave/domain.py` | `MetadataCandidate(Candidate)` с `album_artists`, `year`, `release_date`, `genre`, `url`, `lyrics_available` |
-| `src/soundsave/archive.py` | публичный `update_tag_data`, перенос `get_image_type` |
+| `src/soundsave/archive.py` | публичный `update_tag_data`, MP3/FLAC/M4A, перенос `get_image_type` |
 | `src/soundsave/report.py` | обобщённые `write_csv`/`write_json` |
-| `src/soundsave/config.py` | `DISCOGS_TOKEN`, `DISCOGS_DELAY` |
-| `src/soundsave/cli.py` | subparser `tags`, `--playlist`, `--apply`/`--no-search`/`--no-lyrics`, `--source`, `--discogs-delay` |
-| `src/soundsave/config.py` | `music_dir_configured` for `--playlist` resolution |
+| `src/soundsave/config.py` | `DISCOGS_TOKEN`, `DISCOGS_DELAY`, `music_dir_configured` для `--playlist` |
+| `src/soundsave/cli.py` | subparser `tags`, `--playlist`, `--dir`/`--folder`, `--apply`/`--no-search`/`--no-lyrics`, `--source`, `--discogs-delay` |
 | `src/soundsave/sync.py` | импорт `full_title`/`parse_playlist_url`/`get_image_type` из `archive.py` и `yandex_catalog.py` |
-| `tests/test_tags.py` | матчинг, diff, политика «только пустые», запись |
+| `tests/test_tags.py` | матчинг, diff, политика «только пустые», запись, M4A |
 | `tests/test_yandex_catalog.py` | плейлист, batch, search, ошибки |
 | `tests/test_discogs_catalog.py` | Discogs search/release/cover, throttle, `CompositeCatalog` |
-| `tests/test_cli.py` | парсер и диспетчеризация `tags`, выбор источников |
-| `tests/test_archive.py` | сохранение неизвестных кадров, MP3/FLAC, атомарность |
+| `tests/test_cli.py` | парсер и диспетчеризация `tags`, выбор источников, `--folder`/`--playlist` |
+| `tests/test_archive.py` | сохранение неизвестных кадров, MP3/FLAC/M4A, атомарность |
 | `README.md`, `CHANGELOG.md`, `.env.template` | описание команды и настройки |
 
 ## 11. Тестирование
@@ -287,7 +294,10 @@ soundsave tags --playlist Chill --apply # заполнить пропуски в
 * `lyrics_info` без текста и `--no-lyrics` не приводят к запросу;
 * ошибка `get_lyrics` не мешает записать остальные поля;
 * пустой `WOAF` заполняется, валидный — используется для точного матчинга;
-* неизвестные ID3-кадры (TXXX/PRIV) и FLAC pictures сохраняются;
+* неизвестные ID3-кадры (TXXX/PRIV), FLAC pictures и MP4-атомы сохраняются;
+* M4A: `©nam`/`©ART`/`©alb`/`aART`/`©day`/`©gen`/`©lyr`/`covr` и freeform
+  `WOAF` записываются только в пустые поля, существующие значения не
+  перезаписываются;
 * атомарная запись: при ошибке оригинал не меняется, временный файл удалён;
 * CSV/JSON содержат `MetadataReportRow`;
 * CLI: `tags` без `--apply` ничего не пишет, с `--apply` пишет.

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from mutagen.id3 import APIC, ID3, PRIV, TALB, TIT2, TPE1, TXXX, USLT
+from mutagen.mp4 import MP4
 
 from soundsave.archive import (
     ArchiveError,
@@ -17,6 +18,12 @@ from soundsave.archive import (
     sanitize_component,
     update_tag_data,
 )
+
+DATA = Path(__file__).with_name('fixtures')
+
+
+def make_m4a(path: Path) -> None:
+    path.write_bytes((DATA / 'silence.m4a').read_bytes())
 
 
 def make_mp3(path: Path, *, bitrate_index: int, frame_length: int, frames: int = 20) -> None:
@@ -65,7 +72,13 @@ class TestParseFilename:
         assert parse_filename('temp_download.mp3') is None
 
     def test_ignores_other_extensions(self) -> None:
-        assert parse_filename('0001. Artist - Title.m4a') is None
+        assert parse_filename('0001. Artist - Title.wav') is None
+
+    def test_m4a_extension(self) -> None:
+        parts = parse_filename('0001. Artist - Title.m4a')
+        assert parts is not None
+        assert parts.file_id == 1
+        assert parts.extension == 'm4a'
 
 
 class TestBuildFilename:
@@ -120,6 +133,17 @@ class TestReadLocalTrack:
         track = read_local_track(path)
         assert track.artist == 'Artist'
         assert track.title == 'Title'
+
+    def test_reads_m4a_fallback(self, tmp_path: Path) -> None:
+        path = tmp_path / '0003. Artist - Title.m4a'
+        make_m4a(path)
+
+        track = read_local_track(path)
+
+        assert track.file_id == 3
+        assert track.artist == 'Artist'
+        assert track.title == 'Title'
+        assert track.quality.codec == 'aac'
 
 
 class TestCopyTags:
@@ -280,6 +304,66 @@ class TestUpdateTagData:
         assert data.cover_type == 3
         assert data.url == 'https://music.yandex.ru/album/10/track/123'
         assert not update_tag_data(path, TagData(title='Another title'))
+
+    def test_m4a_fills_only_empty_fields(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.m4a'
+        make_m4a(path)
+        cover = b'\xff\xd8\xffcover'
+        url = 'https://music.yandex.ru/album/10/track/123'
+
+        changed = update_tag_data(
+            path,
+            TagData(
+                title='Saturnine',
+                artists=['The Gathering'],
+                album='Mandylion',
+                album_artist='The Gathering',
+                date='1995-08-22',
+                genre='gothic metal',
+                lyrics='text',
+                cover=cover,
+                cover_mime='image/jpeg',
+                url=url,
+            ),
+        )
+
+        assert changed
+        data = read_tag_data(path)
+        assert data.title == 'Saturnine'
+        assert data.artists == ['The Gathering']
+        assert data.album == 'Mandylion'
+        assert data.album_artist == 'The Gathering'
+        assert data.date == '1995-08-22'
+        assert data.genre == 'gothic metal'
+        assert data.lyrics == 'text'
+        assert data.cover == cover
+        assert data.cover_type == 3
+        assert data.url == url
+        assert MP4(path).tags['\xa9too'] == ['Lavf63.1.102']
+
+        assert not update_tag_data(
+            path,
+            TagData(
+                title='Another title',
+                artists=['Another artist'],
+                cover=b'other',
+                cover_mime='image/jpeg',
+                url='https://music.yandex.ru/album/10/track/999',
+            ),
+        )
+        data = read_tag_data(path)
+        assert data.title == 'Saturnine'
+        assert data.artists == ['The Gathering']
+        assert data.cover == cover
+        assert data.url == url
+
+    def test_m4a_preserves_existing_cover(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.m4a'
+        make_m4a(path)
+        update_tag_data(path, TagData(cover=b'existing', cover_mime='image/jpeg'))
+
+        assert not update_tag_data(path, TagData(cover=b'replacement', cover_mime='image/jpeg'))
+        assert read_tag_data(path).cover == b'existing'
 
     def test_rejects_unsupported_format(self, tmp_path: Path) -> None:
         with pytest.raises(ArchiveError, match='Unsupported audio format'):

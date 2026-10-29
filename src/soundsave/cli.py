@@ -29,7 +29,14 @@ logger = logging.getLogger('soundsave')
 
 
 def _add_scan_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('--dir', dest='target_dir', type=Path, help='archive directory (overrides TARGET_DIR)')
+    parser.add_argument(
+        '--dir',
+        '--folder',
+        dest='target_dir',
+        metavar='PATH',
+        type=Path,
+        help='folder to scan (overrides TARGET_DIR)',
+    )
     parser.add_argument('--limit', type=int, help='maximum number of tracks to process')
     parser.add_argument('--id', dest='file_id', type=int, help='only process the track with this numeric id')
     parser.add_argument('--min-score', type=float, help='minimum match score (default: 0.85)')

@@ -124,6 +124,9 @@ soundsave tags --apply
 soundsave tags --playlist Chill
 soundsave tags --playlist Chill --apply
 
+# Check an explicit folder (alias of --dir)
+soundsave tags --folder "D:\Music\Chill"
+
 # Discogs only (e.g. after Yandex has already been applied)
 soundsave tags --source discogs --apply
 
@@ -170,17 +173,23 @@ stores FLAC where Zvuk has it. `--format keep` keeps the best source format
 `soundsave tags` matches each file against the configured Yandex Music
 playlist first, then searches the Yandex catalogue for files that are no longer
 in the playlist. If both fail and `DISCOGS_TOKEN` is set, Discogs is tried as a
-fallback. It reports `missing` fields and `conflicts`; `--apply` fills only
-missing values:
+fallback. It handles MP3, FLAC and AAC `.m4a` files. It reports `missing` fields
+and `conflicts`; `--apply` fills only missing values:
 
 * title, artists, album, album artist, date, genre and `WOAF` (Yandex only);
 * front cover, only if the file has none;
 * lyrics, only if the file has none and Yandex reports text lyrics.
 
+MP3/FLAC use their native frames (`WOAF`, `APIC`/pictures, `USLT`/`lyrics`);
+`.m4a` uses iTunes atoms (`©nam`, `©ART`, `©alb`, `aART`, `©day`, `©gen`,
+`©lyr`, `covr`) and a freeform `----:com.apple.iTunes:WOAF` atom for the Yandex
+URL.
+
 `TRCK` and `TPOS` are local archive data and are never read from Yandex or
-Discogs and never changed. Existing values, including non-front cover pictures,
-are preserved. Writes are atomic: the file is copied to `.soundsave/tmp/`,
-retagged, verified with `mutagen` and then replaced.
+Discogs and never changed; the same applies to the MP4 `trkn`/`disk` atoms.
+Existing values, including non-front cover pictures, are preserved. Writes are
+atomic: the file is copied to `.soundsave/tmp/`, retagged, verified with
+`mutagen` and then replaced.
 
 The default is `--source both`. Use `--source yandex` to disable the Discogs
 fallback, or `--source discogs` to query only Discogs (useful after the Yandex
@@ -199,7 +208,8 @@ By default `tags` scans `TARGET_DIR`, the main playlist. `--playlist NAME`
 checks another immediate subfolder of `MUSIC_DIR` and can be combined with
 `--apply` to fill its missing tags and covers. Without a separate `MUSIC_DIR`
 the folder is resolved next to `TARGET_DIR`, which matches the legacy flat
-layout. `--playlist` cannot be combined with `--dir`.
+layout. `--playlist` cannot be combined with `--dir`. Use `--folder PATH`
+(an alias of `--dir`) to point at any folder explicitly.
 
 ### Exporting a playlist for a container
 

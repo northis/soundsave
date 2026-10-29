@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-30
+
+### Added
+
+- `soundsave tags` now checks and fills tags, covers and lyrics in AAC `.m4a`
+  files as well as MP3 and FLAC. M4A uses iTunes atoms (`©nam`, `©ART`, `©alb`,
+  `aART`, `©day`, `©gen`, `©lyr`, `covr`) and a freeform
+  `----:com.apple.iTunes:WOAF` atom for the Yandex URL; existing values and
+  unknown atoms are preserved.
+- `--folder PATH` is an alias of `--dir` for `soundsave tags` (and the other
+  scan commands), so the folder to check and tag can be set explicitly.
+
 ## [2.3.0] - 2026-10-29
 
 ### Added

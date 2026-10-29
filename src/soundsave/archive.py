@@ -14,7 +14,7 @@ from mutagen.aiff import AIFF
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC, COMM, ID3, TALB, TCON, TDRC, TIT2, TPE1, TPE2, TRCK, USLT, WOAF, ID3NoHeaderError
 from mutagen.mp3 import MP3
-from mutagen.mp4 import MP4, MP4Cover
+from mutagen.mp4 import MP4, AtomDataType, MP4Cover, MP4FreeForm
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 from mutagen.wave import WAVE
@@ -23,8 +23,10 @@ from .domain import AudioQuality, LocalTrack
 
 logger = logging.getLogger(__name__)
 
-FILENAME_RE = re.compile(r'^(\d+)\.\s*(.+?)\s-\s*(.*?)\.(mp3|flac)$', re.IGNORECASE)
+FILENAME_RE = re.compile(r'^(\d+)\.\s*(.+?)\s-\s*(.*?)\.(mp3|flac|m4a)$', re.IGNORECASE)
 AUDIO_EXTENSIONS = frozenset({'.mp3', '.flac'})
+TAGGABLE_EXTENSIONS = frozenset({'.mp3', '.flac', '.m4a'})
+_MP4_URL_KEY = '----:com.apple.iTunes:WOAF'
 _LOSSLESS_EXTENSIONS = frozenset({'.flac', '.wav', '.aiff', '.alac'})
 MAGIC_BYTES = (
     ('image/jpeg', bytes((0xFF, 0xD8, 0xFF))),
@@ -229,6 +231,14 @@ def _read_mp4_tags(path: Path, *, include_cover: bool = True) -> TagData:
     data.genre = _first_tag(tags, '\xa9gen')
     data.comment = _first_tag(tags, '\xa9cmt')
     data.lyrics = _first_text(tags, '\xa9lyr')
+    for frame in tags.get(_MP4_URL_KEY) or []:
+        try:
+            url = str(frame.decode('utf-8') if isinstance(frame, bytes) else frame).strip()
+        except UnicodeDecodeError:
+            continue
+        if url:
+            data.url = url
+            break
     covers = tags.get('covr') or []
     if covers:
         data.has_cover = True
@@ -328,8 +338,9 @@ def scan_archive(
     *,
     limit: int | None = None,
     file_id: int | None = None,
+    extensions: frozenset[str] = AUDIO_EXTENSIONS,
 ) -> list[LocalTrack]:
-    """Scan the top level of *root* for ``.mp3`` and ``.flac`` files."""
+    """Scan the top level of *root* for supported audio files."""
     if not root.exists():
         raise ArchiveError(f'Archive directory does not exist: {root}')
     if not root.is_dir():
@@ -337,7 +348,7 @@ def scan_archive(
 
     tracks: list[LocalTrack] = []
     for path in sorted(root.iterdir(), key=lambda item: item.name.lower()):
-        if not path.is_file() or path.suffix.lower() not in AUDIO_EXTENSIONS:
+        if not path.is_file() or path.suffix.lower() not in extensions:
             continue
         if path.name.startswith('.'):
             continue
@@ -566,6 +577,51 @@ def _update_flac_tags(path: Path, data: TagData) -> bool:
     return True
 
 
+def _update_mp4_tags(path: Path, data: TagData) -> bool:
+    existing = _read_mp4_tags(path)
+    audio = MP4(path)
+    if audio.tags is None:
+        audio.add_tags()
+    tags = audio.tags
+    if tags is None:
+        raise ArchiveError(f'Could not create MP4 tags: {path}')
+
+    changed = False
+    if data.title and not has_text(existing.title):
+        tags['\xa9nam'] = [data.title]
+        changed = True
+    if data.artists and not has_artists(existing.artists):
+        tags['\xa9ART'] = list(data.artists)
+        changed = True
+    if data.album and not has_text(existing.album):
+        tags['\xa9alb'] = [data.album]
+        changed = True
+    if data.album_artist and not has_text(existing.album_artist):
+        tags['aART'] = [data.album_artist]
+        changed = True
+    if data.date and not has_text(existing.date):
+        tags['\xa9day'] = [data.date]
+        changed = True
+    if data.genre and not has_text(existing.genre):
+        tags['\xa9gen'] = [data.genre]
+        changed = True
+    if data.lyrics and not has_text(existing.lyrics):
+        tags['\xa9lyr'] = [data.lyrics]
+        changed = True
+    if data.url and not has_text(existing.url):
+        tags[_MP4_URL_KEY] = [MP4FreeForm(data.url.encode('utf-8'), dataformat=AtomDataType.UTF8)]
+        changed = True
+    if data.cover and not existing.has_cover:
+        imageformat = MP4Cover.FORMAT_PNG if data.cover_mime == 'image/png' else MP4Cover.FORMAT_JPEG
+        tags['covr'] = [MP4Cover(data.cover, imageformat=imageformat)]
+        changed = True
+
+    if not changed:
+        return False
+    audio.save()
+    return True
+
+
 def update_tag_data(path: Path, data: TagData, *, cover_mode: str = 'missing') -> bool:
     """Fill empty tags in *path* from *data*, preserving all other frames.
 
@@ -579,4 +635,6 @@ def update_tag_data(path: Path, data: TagData, *, cover_mode: str = 'missing') -
         return _update_mp3_tags(path, data)
     if suffix == '.flac':
         return _update_flac_tags(path, data)
+    if suffix in {'.m4a', '.mp4'}:
+        return _update_mp4_tags(path, data)
     raise ArchiveError(f'Unsupported audio format: {path.suffix}')

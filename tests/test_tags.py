@@ -27,6 +27,13 @@ def make_flac(path: Path) -> None:
     path.write_bytes(b'fLaC' + bytes((0x80,)) + (34).to_bytes(3, 'big') + streaminfo)
 
 
+DATA = Path(__file__).with_name('fixtures')
+
+
+def make_m4a(path: Path) -> None:
+    path.write_bytes((DATA / 'silence.m4a').read_bytes())
+
+
 def write_tags(
     path: Path,
     *,
@@ -279,6 +286,28 @@ class TestRunTags:
         assert data.album_artist == 'The Gathering'
         assert data.date == '1995-08-22'
         assert data.genre == 'gothic metal'
+        assert data.url == 'https://music.yandex.ru/album/10/track/123'
+
+    def test_apply_fills_m4a_tags_and_cover(self, tmp_path: Path) -> None:
+        path = tmp_path / '0001. The Gathering - Saturnine.m4a'
+        make_m4a(path)
+        catalog = FakeCatalog(
+            make_candidate(lyrics_available=True),
+            cover=(b'\xff\xd8\xffcover', 'image/jpeg'),
+            lyrics='line',
+        )
+
+        rows = run_tags(make_config(tmp_path), catalog, make_options(apply=True))
+
+        assert rows[0].applied is True
+        assert rows[0].cover == 'added'
+        assert rows[0].lyrics == 'added'
+        data = read_tag_data(path)
+        assert data.title == 'Saturnine'
+        assert data.artists == ['The Gathering']
+        assert data.album == 'Mandylion'
+        assert data.cover == b'\xff\xd8\xffcover'
+        assert data.lyrics == 'line'
         assert data.url == 'https://music.yandex.ru/album/10/track/123'
 
     def test_matched_discogs_fills_fields(self, tmp_path: Path) -> None:

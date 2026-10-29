@@ -94,6 +94,11 @@ class TestTagsParser:
         assert args.file_id is None
         assert args.playlist is None
 
+    def test_folder_alias(self) -> None:
+        args = build_parser().parse_args(['tags', '--folder', 'music'])
+
+        assert args.target_dir == Path('music')
+
     def test_flags(self) -> None:
         args = build_parser().parse_args(
             [
@@ -237,6 +242,12 @@ class TestTagsDispatch:
         monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
 
         assert main(['tags', '--playlist', 'Chill', '--dir', str(tmp_path)]) == 1
+
+    def test_playlist_rejects_folder_alias(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        config = make_config(tmp_path, yandex_token='token')
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+
+        assert main(['tags', '--playlist', 'Chill', '--folder', str(tmp_path)]) == 1
 
     def test_playlist_rejects_nested_name(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         config = make_config(tmp_path, yandex_token='token')
