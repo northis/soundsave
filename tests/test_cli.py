@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,10 @@ import pytest
 from soundsave.catalogs import CompositeCatalog
 from soundsave.cli import build_parser, main
 from soundsave.config import Config
+from soundsave.web.db import LibraryStore
+from soundsave.web.settings import WebSettings
+
+from .web_helpers import make_library, make_mp3
 
 
 def make_config(
@@ -43,11 +48,57 @@ def test_web_parser_has_serve_and_scan() -> None:
 
     scan = build_parser().parse_args(['scan'])
     assert scan.command == 'scan'
+    assert scan.playlist is None
+    assert scan.target_dir is None
+    assert scan.force is False
 
     snapshot = build_parser().parse_args(['snapshot', '--label', 'pre-update', '--keep', '4'])
     assert snapshot.command == 'snapshot'
     assert snapshot.label == 'pre-update'
     assert snapshot.keep == 4
+
+
+def test_scan_parser_rescans_one_playlist() -> None:
+    args = build_parser().parse_args(['scan', '--playlist', 'Chill', '--force'])
+    assert args.playlist == 'Chill'
+    assert args.target_dir is None
+    assert args.force is True
+
+    args = build_parser().parse_args(['scan', '--folder', 'music'])
+    assert args.target_dir == Path('music')
+    assert args.playlist is None
+    assert args.force is False
+
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(['scan', '--playlist', 'Chill', '--dir', 'Chill'])
+
+
+def test_scan_command_rescans_one_playlist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    make_library(tmp_path)
+    music = tmp_path / 'music'
+    config = replace(
+        make_config(tmp_path, music_dir=music, target_dir=music / 'Main', music_dir_configured=True),
+        data_dir=tmp_path / 'data',
+    )
+    monkeypatch.setattr('soundsave.cli.Config.load', lambda *_: config)
+
+    assert main(['scan']) == 0
+    settings = WebSettings.from_config(config)
+    store = LibraryStore(settings.db_path)
+    chill = next(playlist for playlist in store.list_playlists() if playlist.name == 'Chill')
+
+    make_mp3(music / 'Chill' / '0002. Someone - New.mp3', 'New', 'Someone')
+    assert main(['scan', '--playlist', 'Chill']) == 0
+    assert [track.filename for track in store.tracks_for_playlist(chill.id)] == [
+        '01 - Someone - Something.mp3',
+        '0002. Someone - New.mp3',
+    ]
+
+    make_mp3(music / 'Chill' / '0003. Someone - Third.mp3', 'Third', 'Someone')
+    assert main(['scan', '--dir', str(music / 'Chill')]) == 0
+    assert len(store.tracks_for_playlist(chill.id)) == 3
+
+    assert main(['scan', '--playlist', 'Missing']) == 1
 
 
 def test_export_parser() -> None:

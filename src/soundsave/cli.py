@@ -148,7 +148,26 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument('--port', type=int, help='port (overrides SOUNDSAVE_PORT)')
     serve_parser.add_argument('--reload', action='store_true', help='reload on source changes (development)')
 
-    subparsers.add_parser('scan', help='reconcile the web library database with the music folder')
+    scan_parser = subparsers.add_parser('scan', help='reconcile the web library database with the music folder')
+    scan_target = scan_parser.add_mutually_exclusive_group()
+    scan_target.add_argument(
+        '--playlist',
+        metavar='NAME',
+        help='rescan only this playlist folder under MUSIC_DIR',
+    )
+    scan_target.add_argument(
+        '--dir',
+        '--folder',
+        dest='target_dir',
+        metavar='PATH',
+        type=Path,
+        help='rescan only this playlist folder',
+    )
+    scan_parser.add_argument(
+        '--force',
+        action='store_true',
+        help='re-read metadata even when file size and mtime did not change',
+    )
 
     snapshot_parser = subparsers.add_parser('snapshot', help='copy the web library database to DATA_DIR/backups')
     snapshot_parser.add_argument('--label', default='manual', help='snapshot label (default: manual)')
@@ -354,16 +373,48 @@ def _run_serve(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_scan(config: Config) -> int:
+def _run_scan(config: Config, args: argparse.Namespace) -> int:
     from .web.db import LibraryStore
-    from .web.library import LibraryScanner
+    from .web.library import LibraryError, LibraryScanner
     from .web.settings import WebSettings
 
     settings = WebSettings.from_config(config)
     settings.ensure()
     store = LibraryStore(settings.db_path)
     store.init()
-    report = LibraryScanner(settings, store).reconcile()
+    scanner = LibraryScanner(settings, store)
+
+    folder_name: str | None = None
+    if args.playlist is not None:
+        name = args.playlist
+        if not name or Path(name).name != name or name in {'.', '..'}:
+            raise ConfigError(f'--playlist must be a single folder name, got {name!r}')
+        if not settings.is_multi_playlist:
+            raise ConfigError('The library is a single flat playlist; run scan without --playlist')
+        path = settings.playlist_path(name)
+        if not path.is_dir():
+            raise ConfigError(f'Playlist folder does not exist: {path}')
+        folder_name = name
+    elif args.target_dir is not None:
+        path = Path(args.target_dir).expanduser().resolve()
+        if path == settings.music_dir:
+            folder_name = None if settings.is_multi_playlist else '.'
+        elif not settings.is_multi_playlist:
+            raise ConfigError(f'Not the music folder: {path}')
+        elif path.parent != settings.music_dir:
+            raise ConfigError(f'Playlist folder must be an immediate subfolder of MUSIC_DIR: {path}')
+        elif not path.is_dir():
+            raise ConfigError(f'Playlist folder does not exist: {path}')
+        else:
+            folder_name = path.name
+
+    try:
+        if folder_name is None:
+            report = scanner.reconcile(force=args.force)
+        else:
+            report = scanner.reconcile_playlist(folder_name, force=args.force)
+    except LibraryError as exc:
+        raise ConfigError(str(exc)) from exc
     logger.info(
         'Scanned %d playlists, %d tracks: +%d ~%d -%d =%d in %.2fs',
         report.playlists,
@@ -429,6 +480,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == 'export':
             return _run_export(args)
+        # The scan command needs the real TARGET_DIR to know which playlist is
+        # syncable, so it never treats --dir/--playlist as a target override.
+        if args.command == 'scan':
+            return _run_scan(Config.load(args.env_file), args)
         # An explicit --dir/--folder/--playlist makes the configured
         # TARGET_DIR irrelevant, so do not reject a stale default target.
         explicit_target = getattr(args, 'target_dir', None) is not None or getattr(args, 'playlist', None) is not None
@@ -445,8 +500,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_tags(config, args)
         if args.command == 'serve':
             return _run_serve(config, args)
-        if args.command == 'scan':
-            return _run_scan(config)
         if args.command == 'snapshot':
             return _run_snapshot(config, args)
     except (ConfigError, ProviderError, ArchiveError, DownloadError, PlaylistError, ValueError) as exc:

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-30
+
+### Added
+
+- `soundsave scan --playlist NAME` (and `--dir`/`--folder PATH`) reconciles
+  only one playlist folder with the web library database. Other playlists are
+  left untouched, so retagged, renamed or newly added files can be picked up
+  without rescanning the whole library. `--force` re-reads metadata even when
+  a file's size and mtime did not change, e.g. after copying files with
+  preserved timestamps. The same is available over HTTP as
+  `POST /api/playlists/{id}/refresh`.
+
 ## [2.4.1] - 2026-10-30
 
 ### Fixed

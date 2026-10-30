@@ -230,6 +230,18 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail='Track not found')
         return track
 
+    @app.post('/api/playlists/{playlist_id}/refresh', dependencies=[Depends(require_write)])
+    def refresh_playlist(playlist_id: int, force: bool = False) -> JSONResponse:
+        playlist = _playlist_or_404(playlist_id)
+        try:
+            report = scanner.reconcile_playlist(playlist.folder_name, force=force)
+        except LibraryError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.exception('Playlist refresh failed')
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return JSONResponse({'ok': True, 'report': asdict(report)})
+
     @app.get('/api/playlists/{playlist_id}/tracks')
     def tracks(
         playlist_id: int,

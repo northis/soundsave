@@ -216,6 +216,25 @@ def test_refresh_picks_up_new_files(root: Path) -> None:
         assert tracks['total'] == 3
 
 
+def test_playlist_refresh_rescans_only_that_playlist(root: Path) -> None:
+    with make_client(root) as client:
+        playlists = client.get('/api/playlists').json()['playlists']
+        main = next(playlist for playlist in playlists if playlist['syncable'])
+        chill = next(playlist for playlist in playlists if playlist['name'] == 'Chill')
+        make_mp3(root / 'music' / 'Chill' / '0002. New - Track.mp3', 'Track', 'New')
+        make_mp3(root / 'music' / 'Main' / '0003. New - Main.mp3', 'Main', 'New')
+
+        response = client.post(
+            f'/api/playlists/{chill["id"]}/refresh',
+            headers={'X-Soundsave-Request': '1'},
+        )
+
+        assert response.status_code == 200
+        assert response.json()['report']['added'] == 1
+        assert client.get(f'/api/playlists/{chill["id"]}/tracks').json()['total'] == 2
+        assert client.get(f'/api/playlists/{main["id"]}/tracks').json()['total'] == 2
+
+
 def test_startup_reconciles_database_with_disk(root: Path) -> None:
     with make_client(root) as client:
         main = client.get('/api/playlists').json()['playlists'][0]

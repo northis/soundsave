@@ -143,6 +143,10 @@ soundsave serve
 # Reconcile the web index with the music folder without starting the server
 soundsave scan
 
+# Reconcile only one playlist after its files were retagged or renamed
+soundsave scan --playlist Chill
+soundsave scan --folder "D:\Music\Chill" --force
+
 # Copy the web library database to DATA_DIR/backups
 soundsave snapshot --label manual
 
@@ -213,6 +217,31 @@ layout. `--playlist` cannot be combined with `--dir`. Use `--folder PATH`
 `--folder`/`--dir`/`--playlist` takes precedence over the default
 `TARGET_DIR`/`MUSIC_DIR` relationship, so a stale default target does not
 block the run.
+
+### Rescanning the web index
+
+The web player keeps its own SQLite index of playlists and tracks. Besides the
+full reconcile on startup, after sync and on "Refresh", one playlist can be
+resynchronised on its own:
+
+```bash
+# Rescan one playlist folder under MUSIC_DIR
+soundsave scan --playlist Chill
+
+# Rescan an explicit playlist folder, re-reading unchanged files too
+soundsave scan --dir "D:\Music\Chill" --force
+```
+
+Only the selected playlist is touched; other playlists, including folders that
+have disappeared from disk, keep their current rows until a full `soundsave
+scan`. Playlist names resolve like `tags --playlist`: against `MUSIC_DIR`, and
+the folder must be an immediate subfolder of it. In the legacy flat layout,
+where `MUSIC_DIR` itself is the single playlist, use `--dir` or plain `scan`
+instead of `--playlist`. `--force` re-reads tags and cover presence even when
+the file size and mtime did not change, which is useful after copying files
+with preserved timestamps. The same operation is available over HTTP as
+`POST /api/playlists/{id}/refresh` (add `?force=true` to re-read unchanged
+files).
 
 ### Exporting a playlist for a container
 
@@ -307,7 +336,8 @@ MUSIC_DIR/
 Every immediate subfolder is a playlist; files inside are expected at the top
 level (nested directories are ignored). `TARGET_DIR`/`MAIN_PLAYLIST` selects the
 single syncable playlist. The SQLite index is reconciled with disk on container
-startup, after sync and when you press "Refresh".
+startup, after sync, when you press "Refresh", and per playlist with
+`soundsave scan --playlist NAME`.
 
 Docker quick start:
 

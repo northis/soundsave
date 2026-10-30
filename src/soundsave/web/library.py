@@ -81,6 +81,63 @@ class LibraryScanner:
             )
             return report
 
+    def reconcile_playlist(self, folder_name: str, *, force: bool = False) -> ScanReport:
+        """Synchronise one playlist folder, leaving every other playlist untouched.
+
+        Unlike :meth:`reconcile`, this neither discovers other folders nor
+        marks them missing. It is meant for an explicit rescan of one folder
+        after its files were retagged or renamed. With ``force`` every track is
+        re-read even when its size and mtime did not change.
+        """
+        with self._lock:
+            started = time.monotonic()
+            self.settings.ensure()
+            path, name = self._playlist_target(folder_name)
+            report = ScanReport(playlists=1)
+            syncable = path == self.settings.target_dir
+            playlist_id = self.store.upsert_playlist(folder_name, name, syncable=syncable)
+            try:
+                self._scan_playlist(playlist_id, path, force=force, report=report)
+            except Exception as exc:
+                logger.exception('Failed to scan playlist %s', path)
+                self.store.set_playlist_scanned(playlist_id, track_count=0, error=str(exc))
+                raise
+            report.elapsed_s = time.monotonic() - started
+            logger.info(
+                'Playlist %r reconciled: %d tracks (+%d ~%d -%d =%d) in %.2fs',
+                name,
+                report.tracks,
+                report.added,
+                report.updated,
+                report.removed,
+                report.unchanged,
+                report.elapsed_s,
+            )
+            return report
+
+    def _playlist_target(self, folder_name: str) -> tuple[Path, str]:
+        """Resolve a playlist folder name to its path and display name."""
+        if folder_name == '.':
+            if self.settings.is_multi_playlist:
+                raise LibraryError('MUSIC_DIR is the library root; specify a playlist folder instead')
+            path = self.settings.music_dir
+            name = path.name or 'Library'
+        else:
+            if not self.settings.is_multi_playlist:
+                raise LibraryError('The library is a single flat playlist; scan MUSIC_DIR instead')
+            try:
+                path = self.settings.playlist_path(folder_name)
+            except ValueError as exc:
+                raise LibraryError(str(exc)) from exc
+            if path.name.startswith('.') or path.name in _SYSTEM_FOLDERS:
+                raise LibraryError(f'Not a playlist folder: {path}')
+            if path in (self.settings.data_dir, self.settings.covers_dir):
+                raise LibraryError(f'Not a playlist folder: {path}')
+            name = path.name
+        if not path.is_dir():
+            raise LibraryError(f'Playlist folder does not exist: {path}')
+        return path, name
+
     def _discover_playlists(self) -> list[tuple[str, Path, str]]:
         if not self.settings.is_multi_playlist:
             root = self.settings.music_dir
