@@ -335,6 +335,7 @@ class TestRunTags:
         data = read_tag_data(path)
         assert data.album == 'Mandylion'
         assert data.genre == 'gothic metal'
+        assert data.date == '1995-08-22'
         assert data.cover == b'\xff\xd8\xffdiscogs-cover'
         assert data.lyrics == 'discogs lyrics'
         assert data.url is None

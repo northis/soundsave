@@ -21,9 +21,11 @@ from collections.abc import Iterable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote_to_bytes, urlparse
 
 from mutagen import File as MutagenFile
+
+from .text import decode_text, repair_mojibake
 
 logger = logging.getLogger('soundsave')
 
@@ -47,6 +49,7 @@ _CUE_FILE = re.compile(r'^FILE\s+(?:"(?P<quoted>[^"]+)"|(?P<plain>\S+))(?:\s+\S+
 _CUE_TRACK = re.compile(r'^TRACK\s+(\d+)\s+AUDIO\s*$', re.IGNORECASE)
 _CUE_TITLE = re.compile(r'^TITLE\s+"(.*)"\s*$', re.IGNORECASE)
 _CUE_PERFORMER = re.compile(r'^PERFORMER\s+"(.*)"\s*$', re.IGNORECASE)
+_CUE_REM_DATE = re.compile(r'^REM\s+(?:DATE|YEAR)\s+"?([^"]*)"?\s*$', re.IGNORECASE)
 _CUE_INDEX = re.compile(r'^INDEX\s+(\d+)\s+(\d+):(\d+):(\d+)\s*$', re.IGNORECASE)
 
 
@@ -64,6 +67,7 @@ class PlaylistEntry:
     artist: str = ''
     album: str = ''
     album_artist: str = ''
+    date: str = ''
     duration: float | None = None
 
 
@@ -77,6 +81,7 @@ class CueTrack:
     start: float
     end: float | None
     file: Path
+    date: str = ''
 
 
 @dataclass(slots=True)
@@ -86,6 +91,7 @@ class CueSheet:
     path: Path
     title: str = ''
     performer: str = ''
+    date: str = ''
     tracks: list[CueTrack] = field(default_factory=list)
 
 
@@ -104,6 +110,7 @@ class ResolvedTrack:
     duration: float | None
     lossless: bool
     original_track: int | None = None
+    date: str = ''
 
 
 @dataclass(slots=True)
@@ -126,30 +133,25 @@ class ExportReport:
 
 
 def _read_text(path: Path) -> str:
-    raw = path.read_bytes()
-    for encoding in ('utf-8-sig', 'cp1251', 'latin-1'):
-        try:
-            return raw.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return raw.decode('utf-8', errors='replace')
+    return decode_text(path.read_bytes())
 
 
 def _cstr(buffer: bytes, offset: int) -> str:
     if offset < 0 or offset >= len(buffer):
         return ''
     end = buffer.find(b'\x00', offset)
-    return buffer[offset : end if end != -1 else len(buffer)].decode('utf-8', errors='replace')
+    value = buffer[offset : end if end != -1 else len(buffer)]
+    return repair_mojibake(decode_text(value))
 
 
 def _resolve_path(raw: str, base: Path) -> Path:
     """Turn a playlist path into a local one, keeping it unresolved when missing."""
-    value = raw.strip().strip('"')
+    value = repair_mojibake(raw.strip().strip('"'))
     if value.lower().startswith('file://'):
         parsed = urlparse(value)
-        value = unquote(parsed.path)
+        value = decode_text(unquote_to_bytes(parsed.path))
         if parsed.netloc:
-            value = f'//{parsed.netloc}{value}'
+            value = f'//{decode_text(unquote_to_bytes(parsed.netloc))}{value}'
         if re.match(r'^/[A-Za-z]:', value):
             value = value[1:]
     # Keep drive-letter and UNC paths intact even on POSIX: a --map rule may
@@ -182,7 +184,7 @@ def _number(value: str) -> int | None:
 
 
 def _metadata_value(value: str) -> str:
-    value = value.strip()
+    value = repair_mojibake(value.strip())
     if not value or len(value) > 300 or value.lower().startswith('file://'):
         return ''
     return value
@@ -270,6 +272,7 @@ def parse_fpl(data: bytes, base_dir: Path) -> list[PlaylistEntry]:
                 artist=metadata.get('artist', ''),
                 album=metadata.get('album', ''),
                 album_artist=metadata.get('album artist', ''),
+                date=metadata.get('date') or metadata.get('year') or '',
                 duration=duration if 0 < duration < 1e7 else None,
             ),
         )
@@ -282,12 +285,12 @@ def parse_fpl(data: bytes, base_dir: Path) -> list[PlaylistEntry]:
 
 
 def _split_label(label: str) -> tuple[str, str]:
-    value = label.strip()
+    value = repair_mojibake(label.strip())
     if not value:
         return '', ''
     if ' - ' in value:
         artist, _, title = value.partition(' - ')
-        return artist.strip(), title.strip()
+        return repair_mojibake(artist.strip()), repair_mojibake(title.strip())
     return '', value
 
 
@@ -379,13 +382,24 @@ def parse_cue(path: Path) -> CueSheet:
                 start=float(current.get('start') or 0.0),
                 end=None,
                 file=source,
+                date=str(current.get('date') or ''),
             ),
         )
         current = None
 
     for raw_line in _read_text(path).splitlines():
         line = raw_line.strip()
-        if not line or line.upper().startswith('REM '):
+        if not line:
+            continue
+        date_match = _CUE_REM_DATE.match(line)
+        if date_match:
+            value = date_match.group(1).strip()
+            if current is not None:
+                current['date'] = value
+            elif value and not sheet.date:
+                sheet.date = value
+            continue
+        if line.upper().startswith('REM '):
             continue
         match = _CUE_FILE.match(line)
         if match:
@@ -395,21 +409,23 @@ def parse_cue(path: Path) -> CueSheet:
         match = _CUE_TRACK.match(line)
         if match:
             flush()
-            current = {'number': int(match.group(1)), 'title': '', 'performer': '', 'start': None}
+            current = {'number': int(match.group(1)), 'title': '', 'performer': '', 'start': None, 'date': ''}
             continue
         match = _CUE_TITLE.match(line)
         if match:
+            value = repair_mojibake(match.group(1).strip())
             if current is not None:
-                current['title'] = match.group(1).strip()
+                current['title'] = value
             else:
-                sheet.title = match.group(1).strip()
+                sheet.title = value
             continue
         match = _CUE_PERFORMER.match(line)
         if match:
+            value = repair_mojibake(match.group(1).strip())
             if current is not None:
-                current['performer'] = match.group(1).strip()
+                current['performer'] = value
             else:
-                sheet.performer = match.group(1).strip()
+                sheet.performer = value
             continue
         match = _CUE_INDEX.match(line)
         if match and current is not None:
@@ -498,13 +514,15 @@ def _read_tags(path: Path) -> tuple[dict[str, str], float | None]:
     tags: dict[str, str] = {}
     raw_tags = getattr(audio, 'tags', None)
     if raw_tags:
-        for key in ('title', 'artist', 'album', 'albumartist', 'tracknumber'):
+        for key in ('title', 'artist', 'album', 'albumartist', 'tracknumber', 'date', 'year'):
             try:
                 value = raw_tags.get(key)
             except (KeyError, ValueError):
                 continue
             if value:
-                tags[key] = str(value[0])
+                tags[key] = repair_mojibake(str(value[0]))
+    if 'date' not in tags and 'year' in tags:
+        tags['date'] = tags['year']
     length = getattr(getattr(audio, 'info', None), 'length', None)
     return tags, float(length) if length else None
 
@@ -520,8 +538,10 @@ def is_lossless(path: Path) -> bool:
         audio = MutagenFile(path)
     except Exception:  # treat unreadable files as lossy copies
         return False
-    codec = str(getattr(getattr(audio, 'info', None), 'codec', '') or '').lower()
-    return 'alac' in codec
+    info = getattr(audio, 'info', None)
+    codec = str(getattr(info, 'codec', '') or '').lower()
+    description = str(getattr(info, 'codec_description', '') or '').lower()
+    return 'alac' in codec or 'alac' in description
 
 
 # --------------------------------------------------------------------------
@@ -544,10 +564,17 @@ def _resolved_plain(index: int, entry: PlaylistEntry) -> ResolvedTrack:
         duration=entry.duration or tag_duration,
         lossless=is_lossless(entry.path),
         original_track=_number(tags.get('tracknumber', '')),
+        date=tags.get('date') or entry.date,
     )
 
 
-def _resolved_from_cue(index: int, entry: PlaylistEntry, sheet: CueSheet, track: CueTrack) -> ResolvedTrack:
+def _resolved_from_cue(
+    index: int,
+    entry: PlaylistEntry,
+    sheet: CueSheet,
+    track: CueTrack,
+    tags: dict[str, str],
+) -> ResolvedTrack:
     artist = track.performer or sheet.performer or entry.artist or entry.album_artist
     length = _track_length(track)
     return ResolvedTrack(
@@ -562,6 +589,7 @@ def _resolved_from_cue(index: int, entry: PlaylistEntry, sheet: CueSheet, track:
         duration=length or entry.duration,
         lossless=is_lossless(track.file),
         original_track=track.number,
+        date=track.date or sheet.date or entry.date or tags.get('date', ''),
     )
 
 
@@ -569,12 +597,16 @@ def resolve_tracks(entries: Sequence[PlaylistEntry]) -> list[ResolvedTrack]:
     """Expand CUE sheets and fill in metadata for every playlist item."""
     occurrences = Counter(entry.path for entry in entries)
     cue_cache: dict[Path, CueSheet | None] = {}
+    tag_cache: dict[Path, tuple[dict[str, str], float | None]] = {}
     tracks: list[ResolvedTrack] = []
     for entry in entries:
         if entry.path.suffix.lower() == '.cue' and entry.path.is_file():
             sheet = parse_cue(entry.path)
             for cue_track in sheet.tracks:
-                tracks.append(_resolved_from_cue(len(tracks) + 1, entry, sheet, cue_track))
+                if cue_track.file not in tag_cache:
+                    tag_cache[cue_track.file] = _read_tags(cue_track.file)
+                tags, _ = tag_cache[cue_track.file]
+                tracks.append(_resolved_from_cue(len(tracks) + 1, entry, sheet, cue_track, tags))
             continue
         sheet = None
         cue_track = None
@@ -583,7 +615,10 @@ def resolve_tracks(entries: Sequence[PlaylistEntry]) -> list[ResolvedTrack]:
             if sheet is not None:
                 cue_track = _match_cue_track(entry, sheet, occurrences[entry.path])
         if sheet is not None and cue_track is not None:
-            tracks.append(_resolved_from_cue(len(tracks) + 1, entry, sheet, cue_track))
+            if cue_track.file not in tag_cache:
+                tag_cache[cue_track.file] = _read_tags(cue_track.file)
+            tags, _ = tag_cache[cue_track.file]
+            tracks.append(_resolved_from_cue(len(tracks) + 1, entry, sheet, cue_track, tags))
         else:
             tracks.append(_resolved_plain(len(tracks) + 1, entry))
     return tracks
@@ -596,6 +631,7 @@ def resolve_tracks(entries: Sequence[PlaylistEntry]) -> list[ResolvedTrack]:
 
 def safe_component(value: str, *, limit: int = 120) -> str:
     """Return *value* as a file-name component that every platform accepts."""
+    value = repair_mojibake(value)
     value = unicodedata.normalize('NFC', value)
     value = _ILLEGAL.sub('_', value)
     value = ' '.join(value.split()).strip(' .')
@@ -629,17 +665,34 @@ def _apply_mapping(path: Path, mappings: Iterable[tuple[str, str]]) -> Path:
     return path
 
 
-def _write_track_number(path: Path, number: int) -> None:
+def _retag_copied(path: Path, track: ResolvedTrack) -> None:
+    """Set the playlist number and repair mojibake in a copied file's tags."""
     try:
         audio = MutagenFile(path, easy=True)
         if audio is None:
             return
         if audio.tags is None:
             audio.add_tags()
-        audio['tracknumber'] = str(number)
+        for key, value in (
+            ('title', track.title),
+            ('artist', track.artist),
+            ('album', track.album),
+            ('albumartist', track.album_artist),
+            ('date', track.date),
+        ):
+            if not value:
+                continue
+            try:
+                current = audio.get(key)
+            except (KeyError, ValueError):
+                continue
+            current_value = str(current[0]) if current else ''
+            if current_value and repair_mojibake(current_value) != current_value:
+                audio[key] = value
+        audio['tracknumber'] = str(track.index)
         audio.save()
     except Exception as exc:  # tagging is best effort
-        logger.warning('Cannot set the track number in %s: %s', path.name, exc)
+        logger.warning('Cannot set tags in %s: %s', path.name, exc)
 
 
 def _transcode(
@@ -653,6 +706,7 @@ def _transcode(
     artist: str,
     album: str,
     album_artist: str,
+    date: str,
     number: int,
     bitrate: int,
 ) -> None:
@@ -667,6 +721,8 @@ def _transcode(
         '0:a:0',
         '-map',
         '0:v?',
+        '-map_metadata',
+        '0',
         '-c:a',
         'aac',
         '-b:a',
@@ -686,6 +742,8 @@ def _transcode(
         command += ['-metadata', f'album={album}']
     if album_artist:
         command += ['-metadata', f'album_artist={album_artist}']
+    if date:
+        command += ['-metadata', f'date={date}']
     command += ['-metadata', f'track={number}', str(destination)]
     try:
         subprocess.run(command, check=True, capture_output=True, text=True)
@@ -709,10 +767,11 @@ def _write_m3u8(playlist: Path, output_dir: Path, tracks: Sequence[ResolvedTrack
     for track, name in zip(tracks, names, strict=True):
         duration = round(track.duration) if track.duration else -1
         label = ' - '.join(part for part in (track.artist, track.title) if part) or name
-        label = label.replace('\r', ' ').replace('\n', ' ')
+        label = repair_mojibake(label.replace('\r', ' ').replace('\n', ' '))
         lines.append(f'#EXTINF:{duration},{label}')
         lines.append(name)
-    target.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    with target.open('w', encoding='utf-8', newline='\n') as handle:
+        handle.write('\n'.join(lines) + '\n')
     return target
 
 
@@ -793,6 +852,7 @@ def export_playlist(
                     artist=track.artist,
                     album=track.album,
                     album_artist=track.album_artist,
+                    date=track.date,
                     number=track.index,
                     bitrate=bitrate,
                 )
@@ -800,7 +860,7 @@ def export_playlist(
             else:
                 shutil.copy2(track.source, temporary)
                 if retag:
-                    _write_track_number(temporary, track.index)
+                    _retag_copied(temporary, track)
                 report.copied += 1
             temporary.replace(destination)
         except (OSError, PlaylistError) as exc:

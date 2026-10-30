@@ -140,7 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument(
         '--no-retag',
         action='store_true',
-        help='keep the original track numbers in copied files',
+        help='keep the original tags and track numbers in copied files',
     )
 
     serve_parser = subparsers.add_parser('serve', help='run the web player and PWA')

@@ -368,6 +368,9 @@ def _process_track(
         return row, False
 
     if row.cover == 'missing':
+        # The candidate carries the album from the matched release, so a local
+        # file without an album tag still gets the Discogs cover; album and
+        # cover are written together by the single _apply_file() call below.
         try:
             cover = catalog.fetch_cover(candidate)
         except Exception as exc:

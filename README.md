@@ -207,6 +207,10 @@ seconds, i.e. 30 requests/minute against the 60/minute limit) and retried on
 HTTP 429 using `Retry-After`. Discogs does not provide lyrics and is not used
 for `WOAF`.
 
+Discogs covers are fetched from the matched release, so a track without a
+local album tag still gets the album and the cover in one write; the local
+album is not required for the cover lookup.
+
 `--no-search` skips catalogue search and uses only the Yandex playlist;
 `--no-lyrics` skips lyrics. Yandex text lyrics are not available for every
 track; those files are reported as `lyrics: unavailable`.
@@ -259,18 +263,26 @@ soundsave export "Road trip.fpl" --output ./export --map "D:\Music=/mnt/music"
 ```
 
 * Lossy sources (`.mp3`, AAC `.m4a`, `.ogg`, `.opus`, …) are copied as they
-  are; their audio is never re-encoded.
+  are; their audio is never re-encoded. ALAC in `.m4a`/`.mp4` is detected by
+  its codec and treated as lossless, while AAC `.m4a` stays a lossy copy.
 * Lossless sources (`.flac`, `.ape`, `.wav`, `.aiff`, ALAC, …) are transcoded
-  to AAC in an `.m4a` container with `ffmpeg`, 256 kbps by default.
+  to AAC in an `.m4a` container with `ffmpeg`, 256 kbps by default. The release
+  date is preserved from the source tags and, for CUE albums, from `REM DATE`
+  or `REM YEAR`.
 * `.ape`/`.flac` albums described by a CUE sheet are split at the sheet's
   `INDEX` times. Both a `.cue` file in the playlist and subsong items
   (`album.ape|subsong=N`, as written by foobar2000) are understood.
+* Playlists and CUE sheets are decoded automatically as UTF-8, UTF-16 or
+  Windows-1251. Mojibake from old cp1251 tags is repaired on the fly for file
+  names, copied-file tags and the generated `.m3u8`.
 * Files are named `<playlist number>. <artist> - <title>.<ext>`, with leading
   zeros wide enough to keep the folder sortable (`07. …`, `007. …`). Illegal
   file-name characters are replaced with `_`.
 * Every new file gets the playlist position as its track number; copied lossy
-  files are retagged too unless `--no-retag` is passed.
-* An `<playlist>.m3u8` is written next to the files unless `--no-m3u8` is used.
+  files are retagged too unless `--no-retag` is passed. Retagging also repairs
+  mojibake in title, artist, album and date.
+* An `<playlist>.m3u8` is written next to the files as UTF-8 unless
+  `--no-m3u8` is used.
 * `--force` overwrites existing files; otherwise they are skipped. `--dry-run`
   only prints the plan. `--map FROM=TO` rewrites a path prefix, which is useful
   when the playlist was saved on another machine.

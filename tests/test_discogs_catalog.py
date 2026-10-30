@@ -156,6 +156,20 @@ class TestDiscogsCatalogFind:
         assert match.candidate.url is None
         assert match.candidate.lyrics_available is False
 
+    def test_matches_and_fetches_cover_without_local_album(self) -> None:
+        client = FakeDiscogsClient(search_results=[make_search_result()], releases={123: make_release()})
+        catalog = make_catalog(client)
+
+        match = catalog.find([make_query(album=None)], url=None, search=True, min_score=0.85, tolerance=5.0)
+
+        assert match.status == 'matched_discogs'
+        assert match.candidate is not None
+        assert match.candidate.album == 'Mandylion'
+        assert catalog.has_cover(match.candidate)
+        assert catalog.fetch_cover(match.candidate) == (b'\xff\xd8\xffcover', 'image/jpeg')
+        assert client.search_calls[0]['artist'] == 'The Gathering'
+        assert client.search_calls[0]['track'] == 'Saturnine'
+
     def test_no_results(self) -> None:
         client = FakeDiscogsClient(search_results=[])
         catalog = make_catalog(client)

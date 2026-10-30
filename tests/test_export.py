@@ -2,18 +2,26 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
+from urllib.parse import quote_from_bytes
 
 import pytest
+from mutagen import File as MutagenFile
+from mutagen.flac import FLAC
+from mutagen.id3 import ID3, TDRC, TIT2, TPE1
 
 from soundsave.export import (
     FPL_MAGIC,
     PlaylistEntry,
     PlaylistError,
     ResolvedTrack,
+    _resolve_path,
+    _transcode,
     export_playlist,
+    is_lossless,
     parse_cue,
     parse_fpl,
     parse_m3u8,
+    parse_playlist,
     resolve_tracks,
     safe_component,
     track_filename,
@@ -22,7 +30,7 @@ from soundsave.export import (
 from .web_helpers import make_mp3
 
 
-def make_fpl(path: Path, entries: list[dict[str, object]]) -> None:
+def make_fpl(path: Path, entries: list[dict[str, object]], *, encoding: str = 'utf-8') -> None:
     """Write a minimal v1 foobar2000 playlist for the parser tests."""
     strings = bytearray()
     offsets: dict[str, int] = {}
@@ -30,7 +38,7 @@ def make_fpl(path: Path, entries: list[dict[str, object]]) -> None:
     def add(value: str) -> int:
         if value not in offsets:
             offsets[value] = len(strings)
-            strings.extend(value.encode('utf-8') + b'\x00')
+            strings.extend(value.encode(encoding) + b'\x00')
         return offsets[value]
 
     chunks = bytearray()
@@ -279,3 +287,188 @@ def test_export_requires_ffmpeg_for_lossless_tracks(tmp_path: Path, monkeypatch:
 def test_export_rejects_a_missing_playlist(tmp_path: Path) -> None:
     with pytest.raises(PlaylistError, match='Playlist not found'):
         export_playlist(tmp_path / 'missing.fpl', tmp_path / 'out')
+
+
+def test_parse_playlist_decodes_cp1251_and_utf16(tmp_path: Path) -> None:
+    playlist = tmp_path / 'list.m3u8'
+    content = '#EXTM3U\n#EXTINF:100,Исполнитель - Название\nтрек.mp3\n'
+
+    playlist.write_bytes(content.encode('cp1251'))
+    entries = parse_playlist(playlist)
+    assert entries[0].artist == 'Исполнитель'
+    assert entries[0].title == 'Название'
+    assert entries[0].path == tmp_path / 'трек.mp3'
+
+    playlist.write_bytes(content.encode('utf-16'))
+    entries = parse_playlist(playlist)
+    assert entries[0].artist == 'Исполнитель'
+    assert entries[0].title == 'Название'
+
+
+def test_resolve_path_decodes_percent_encoded_cp1251(tmp_path: Path) -> None:
+    target = tmp_path / 'трек.mp3'
+    raw = str(target)
+    encoded = quote_from_bytes(raw.removeprefix('/').encode('cp1251'))
+
+    assert _resolve_path(f'file:///{encoded}', tmp_path) == target
+
+
+def test_parse_fpl_decodes_cp1251(tmp_path: Path) -> None:
+    audio = tmp_path / 'альбом.ape'
+    audio.write_bytes(b'ape')
+    playlist = tmp_path / 'list.fpl'
+    make_fpl(
+        playlist,
+        [
+            {
+                'path': str(audio),
+                'metadata': {
+                    'title': 'Название',
+                    'artist': 'Исполнитель',
+                    'album': 'Альбом',
+                    'date': '1995',
+                },
+            },
+        ],
+        encoding='cp1251',
+    )
+
+    entries = parse_fpl(playlist.read_bytes(), tmp_path)
+
+    assert entries[0].path == audio
+    assert entries[0].title == 'Название'
+    assert entries[0].artist == 'Исполнитель'
+    assert entries[0].album == 'Альбом'
+    assert entries[0].date == '1995'
+
+
+def test_parse_cue_decodes_cp1251_and_reads_rem_date(tmp_path: Path) -> None:
+    cue = tmp_path / 'album.cue'
+    cue.write_bytes(
+        'REM DATE 1995\n'
+        'PERFORMER "Исполнитель"\n'
+        'TITLE "Альбом"\n'
+        'FILE "альбом.ape" WAVE\n'
+        '  TRACK 01 AUDIO\n'
+        '    TITLE "Песня"\n'
+        '    INDEX 01 00:00:00\n'.encode('cp1251'),
+    )
+
+    sheet = parse_cue(cue)
+
+    assert sheet.title == 'Альбом'
+    assert sheet.performer == 'Исполнитель'
+    assert sheet.date == '1995'
+    assert sheet.tracks[0].title == 'Песня'
+    assert sheet.tracks[0].file == tmp_path / 'альбом.ape'
+
+
+def test_resolve_tracks_reads_cue_date(tmp_path: Path) -> None:
+    audio = tmp_path / 'album.ape'
+    audio.write_bytes(b'ape')
+    (tmp_path / 'album.cue').write_text(
+        'REM DATE 1995\nFILE "album.ape" WAVE\n  TRACK 01 AUDIO\n    TITLE "First"\n    INDEX 01 00:00:00\n',
+        encoding='utf-8',
+    )
+
+    tracks = resolve_tracks([PlaylistEntry(path=audio, subsong=0)])
+
+    assert tracks[0].date == '1995'
+
+
+def test_resolve_tracks_reads_date_from_cue_source_tags(tmp_path: Path) -> None:
+    audio = tmp_path / 'album.flac'
+    packed = (44100 << 44) | (15 << 36)
+    streaminfo = (
+        (4096).to_bytes(2, 'big') + (4096).to_bytes(2, 'big') + b'\x00' * 6 + packed.to_bytes(8, 'big') + b'\x00' * 16
+    )
+    audio.write_bytes(b'fLaC' + bytes((0x80,)) + (34).to_bytes(3, 'big') + streaminfo)
+    flac = FLAC(audio)
+    flac['date'] = '1998'
+    flac.save()
+    (tmp_path / 'album.cue').write_text(
+        'FILE "album.flac" WAVE\n  TRACK 01 AUDIO\n    TITLE "First"\n    INDEX 01 00:00:00\n',
+        encoding='utf-8',
+    )
+
+    tracks = resolve_tracks([PlaylistEntry(path=audio, subsong=0)])
+
+    assert tracks[0].date == '1998'
+
+
+def test_export_repairs_mojibake_in_names_tags_and_playlist(tmp_path: Path) -> None:
+    source = tmp_path / 'source'
+    source.mkdir()
+    audio = source / 'one.mp3'
+    make_mp3(audio, 'placeholder', 'placeholder')
+    tags = ID3(audio)
+    tags.setall('TIT2', [TIT2(encoding=0, text='Ìîñêâà')])
+    tags.setall('TPE1', [TPE1(encoding=0, text='Èñïîëíèòåëü')])
+    tags.setall('TDRC', [TDRC(encoding=3, text='1995')])
+    tags.save(audio)
+    playlist = source / 'list.m3u8'
+    playlist.write_bytes('#EXTM3U\none.mp3\n'.encode('cp1251'))
+    output = tmp_path / 'out'
+
+    report = export_playlist(playlist, output)
+
+    assert report.ok
+    exported = output / '01. Исполнитель - Москва.mp3'
+    assert exported.is_file()
+    copied = MutagenFile(exported, easy=True)
+    assert copied is not None
+    assert str(copied['title'][0]) == 'Москва'
+    assert str(copied['artist'][0]) == 'Исполнитель'
+    assert str(copied['date'][0]) == '1995'
+    playlist_text = (output / 'list.m3u8').read_text(encoding='utf-8')
+    assert ',Исполнитель - Москва' in playlist_text
+    assert '01. Исполнитель - Москва.mp3' in playlist_text
+
+
+def test_transcode_passes_release_date(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / 'album.flac'
+    source.write_bytes(b'flac')
+    destination = tmp_path / 'out.m4a'
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> None:
+        calls.append(command)
+        destination.write_bytes(b'out')
+
+    monkeypatch.setattr('soundsave.export.subprocess.run', fake_run)
+
+    _transcode(
+        source,
+        destination,
+        ffmpeg='ffmpeg',
+        start=None,
+        end=None,
+        title='Title',
+        artist='Artist',
+        album='Album',
+        album_artist='Artist',
+        date='1995-08-22',
+        number=1,
+        bitrate=256,
+    )
+
+    assert 'date=1995-08-22' in calls[0]
+    assert calls[0][calls[0].index('-map_metadata') + 1] == '0'
+
+
+def test_is_lossless_checks_the_mp4_codec(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    class AlacInfo:
+        codec = ''
+        codec_description = 'ALAC'
+
+    class AlacAudio:
+        info = AlacInfo()
+
+    monkeypatch.setattr('soundsave.export.MutagenFile', lambda _: AlacAudio())
+
+    assert is_lossless(tmp_path / 'track.m4a') is True
+    assert is_lossless(tmp_path / 'track.mp4') is True
+
+
+def test_is_lossless_treats_aac_m4a_as_lossy() -> None:
+    assert is_lossless(Path(__file__).with_name('fixtures') / 'silence.m4a') is False

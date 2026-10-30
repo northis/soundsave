@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-10-30
+
+### Added
+
+- `soundsave export` now decodes `.fpl`, `.m3u`/`.m3u8` and CUE inputs as
+  UTF-8, UTF-16 or Windows-1251 automatically. Mojibake from old cp1251 tags
+  is repaired on the fly, so exported file names, tags of copied files and the
+  generated `.m3u8` use correct text; the playlist file is written as UTF-8.
+- Release dates are preserved by `export`, including source `date`/`year` tags
+  and CUE `REM DATE`/`REM YEAR`, and are written to the AAC `.m4a` output of
+  lossless transcodes.
+
+### Changed
+
+- `export` inspects the MP4 codec (including `codec_description`): ALAC in
+  `.m4a`/`.mp4` is treated as lossless and transcoded to AAC, while AAC
+  `.m4a` remains a lossy copy.
+
 ## [2.6.0] - 2026-10-30
 
 ### Added
