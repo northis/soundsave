@@ -7,6 +7,7 @@ import pytest
 from mutagen.id3 import ID3, TIT2
 
 from soundsave.archive import read_tag_data
+from soundsave.web.cover_cache import cover_cache_key
 from soundsave.web.db import LibraryStore
 from soundsave.web.library import LibraryError, LibraryScanner
 from soundsave.web.metadata import read_library_metadata
@@ -268,6 +269,27 @@ def test_reconcile_playlist_keeps_disappeared_playlists_visible(root: Path) -> N
     assert {playlist.name for playlist in store.list_playlists()} == {'Main', 'Chill'}
     chill = next(playlist for playlist in store.list_playlists() if playlist.name == 'Chill')
     assert chill.missing is False
+
+
+def test_reconcile_playlist_drops_cached_covers_on_request(root: Path) -> None:
+    make_library(root)
+    scanner, store = make_scanner(root)
+    scanner.reconcile()
+    main = store.get_syncable_playlist()
+    assert main is not None
+    track = store.tracks_for_playlist(main.id)[0]
+    path = scanner.settings.playlist_path(main.folder_name) / track.filename
+
+    current = scanner.settings.covers_dir / f'{cover_cache_key(path, track.etag)}.webp'
+    legacy = scanner.settings.covers_dir / f'{cover_cache_key(path, track.etag, version=1)}.webp'
+    current.write_bytes(b'current')
+    legacy.write_bytes(b'legacy')
+
+    report = scanner.reconcile_playlist('Main', refresh_covers=True)
+
+    assert report.covers == 2
+    assert not current.exists()
+    assert not legacy.exists()
 
 
 def test_reconcile_playlist_rejects_subfolders_in_flat_mode(root: Path) -> None:

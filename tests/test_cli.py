@@ -51,6 +51,7 @@ def test_web_parser_has_serve_and_scan() -> None:
     assert scan.playlist is None
     assert scan.target_dir is None
     assert scan.force is False
+    assert scan.covers is False
 
     snapshot = build_parser().parse_args(['snapshot', '--label', 'pre-update', '--keep', '4'])
     assert snapshot.command == 'snapshot'
@@ -59,15 +60,17 @@ def test_web_parser_has_serve_and_scan() -> None:
 
 
 def test_scan_parser_rescans_one_playlist() -> None:
-    args = build_parser().parse_args(['scan', '--playlist', 'Chill', '--force'])
+    args = build_parser().parse_args(['scan', '--playlist', 'Chill', '--force', '--covers'])
     assert args.playlist == 'Chill'
     assert args.target_dir is None
     assert args.force is True
+    assert args.covers is True
 
     args = build_parser().parse_args(['scan', '--folder', 'music'])
     assert args.target_dir == Path('music')
     assert args.playlist is None
     assert args.force is False
+    assert args.covers is False
 
     with pytest.raises(SystemExit):
         build_parser().parse_args(['scan', '--playlist', 'Chill', '--dir', 'Chill'])

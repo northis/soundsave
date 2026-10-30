@@ -147,6 +147,9 @@ soundsave scan
 soundsave scan --playlist Chill
 soundsave scan --folder "D:\Music\Chill" --force
 
+# Rebuild the cached cover thumbnails of one playlist
+soundsave scan --playlist Chill --covers
+
 # Copy the web library database to DATA_DIR/backups
 soundsave snapshot --label manual
 
@@ -239,9 +242,10 @@ the folder must be an immediate subfolder of it. In the legacy flat layout,
 where `MUSIC_DIR` itself is the single playlist, use `--dir` or plain `scan`
 instead of `--playlist`. `--force` re-reads tags and cover presence even when
 the file size and mtime did not change, which is useful after copying files
-with preserved timestamps. The same operation is available over HTTP as
-`POST /api/playlists/{id}/refresh` (add `?force=true` to re-read unchanged
-files).
+with preserved timestamps. `--covers` removes the cached cover thumbnails of
+the scanned playlists, so the web player rebuilds them with the current rules.
+The same operations are available over HTTP as `POST /api/playlists/{id}/refresh`
+(add `?force=true` and/or `?covers=true`).
 
 ### Exporting a playlist for a container
 
@@ -367,7 +371,8 @@ older `API_KEY` alias.
 The player:
 
 * streams files with HTTP Range, so seeking and fast starts work;
-* shows embedded covers (resized and cached) or a placeholder;
+* shows embedded covers up to 1000 px (smaller covers are served unchanged,
+  larger ones are scaled down and cached) or a placeholder;
 * supports play/pause, previous/next, a full-width horizontal seek bar, shuffle
   within the current playlist, repeat off/all/one and volume;
 * sorts by playlist number, title or artist and keeps the playing track in the

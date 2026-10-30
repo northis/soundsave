@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-30
+
+### Added
+
+- `soundsave scan --covers` removes cached cover thumbnails for the scanned
+  playlists, so the web player rebuilds them with the current rules. The same
+  is available over HTTP as `covers=true` on `POST /api/refresh` and
+  `POST /api/playlists/{id}/refresh`.
+
+### Changed
+
+- Embedded covers are now cached at up to 1000 px instead of 256 px. Covers
+  that are already 1000 px or smaller are served as their original image
+  bytes, without re-encoding; larger covers are scaled down proportionally and
+  stored as WebP. The cache version is part of the cover URL, so browsers pick
+  up the new size for tracks they have already seen.
+
 ## [2.5.0] - 2026-10-30
 
 ### Added

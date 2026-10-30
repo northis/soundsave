@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ..config import Config
 from .buildinfo import build_info
+from .cover_cache import COVER_CACHE_VERSION
 from .covers import CoverCache
 from .db import LibraryStore, PlaylistRow, TrackRow
 from .library import LibraryError, LibraryScanner
@@ -79,7 +80,11 @@ def _track_json(playlist_id: int, track: TrackRow) -> dict[str, object]:
         'size_bytes': track.size_bytes,
         'etag': track.etag,
         'has_cover': track.has_cover,
-        'cover_url': f'/api/playlists/{playlist_id}/tracks/{track.id}/cover?v={version}' if track.has_cover else None,
+        'cover_url': (
+            f'/api/playlists/{playlist_id}/tracks/{track.id}/cover?v={COVER_CACHE_VERSION}-{version}'
+            if track.has_cover
+            else None
+        ),
         'audio_url': f'/api/playlists/{playlist_id}/tracks/{track.id}/audio?v={version}',
     }
 
@@ -210,9 +215,9 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
         return {'ok': True}
 
     @app.post('/api/refresh', dependencies=[Depends(require_write)])
-    def refresh(force: bool = False) -> JSONResponse:
+    def refresh(force: bool = False, covers: bool = False) -> JSONResponse:
         try:
-            report = scanner.reconcile(force=force)
+            report = scanner.reconcile(force=force, refresh_covers=covers)
         except Exception as exc:
             logger.exception('Library refresh failed')
             raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -231,10 +236,10 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
         return track
 
     @app.post('/api/playlists/{playlist_id}/refresh', dependencies=[Depends(require_write)])
-    def refresh_playlist(playlist_id: int, force: bool = False) -> JSONResponse:
+    def refresh_playlist(playlist_id: int, force: bool = False, covers: bool = False) -> JSONResponse:
         playlist = _playlist_or_404(playlist_id)
         try:
-            report = scanner.reconcile_playlist(playlist.folder_name, force=force)
+            report = scanner.reconcile_playlist(playlist.folder_name, force=force, refresh_covers=covers)
         except LibraryError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except Exception as exc:

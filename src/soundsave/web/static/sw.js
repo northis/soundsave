@@ -2,7 +2,7 @@
 
 const SHELL_CACHE = 'soundsave-shell-v16';
 const AUDIO_CACHE = 'soundsave-audio-v1';
-const COVER_CACHE = 'soundsave-covers-v1';
+const COVER_CACHE = 'soundsave-covers-v2';
 const API_CACHE = 'soundsave-api-v1';
 const KEEP = new Set([SHELL_CACHE, AUDIO_CACHE, COVER_CACHE, API_CACHE]);
 

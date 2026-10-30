@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .cover_cache import COVER_CACHE_EXTENSIONS, COVER_CACHE_VERSIONS, cover_cache_key
 from .db import LibraryStore, PlaylistRow, TrackRow
 from .metadata import (
     etag_for_stat,
@@ -37,6 +38,7 @@ class ScanReport:
     updated: int = 0
     removed: int = 0
     unchanged: int = 0
+    covers: int = 0
     warnings: list[str] = field(default_factory=list)
     elapsed_s: float = 0.0
 
@@ -49,7 +51,7 @@ class LibraryScanner:
         self.store = store
         self._lock = threading.RLock()
 
-    def reconcile(self, *, force: bool = False) -> ScanReport:
+    def reconcile(self, *, force: bool = False, refresh_covers: bool = False) -> ScanReport:
         """Synchronise playlists and tracks; disk is the source of truth."""
         with self._lock:
             started = time.monotonic()
@@ -62,7 +64,13 @@ class LibraryScanner:
                 playlist_id = self.store.upsert_playlist(folder_name, name, syncable=syncable)
                 report.playlists += 1
                 try:
-                    self._scan_playlist(playlist_id, path, force=force, report=report)
+                    self._scan_playlist(
+                        playlist_id,
+                        path,
+                        force=force,
+                        refresh_covers=refresh_covers,
+                        report=report,
+                    )
                 except Exception as exc:
                     logger.exception('Failed to scan playlist %s', path)
                     report.warnings.append(f'{name}: {exc}')
@@ -70,24 +78,33 @@ class LibraryScanner:
             self.store.mark_missing(active)
             report.elapsed_s = time.monotonic() - started
             logger.info(
-                'Library reconciled: %d playlists, %d tracks (+%d ~%d -%d =%d) in %.2fs',
+                'Library reconciled: %d playlists, %d tracks (+%d ~%d -%d =%d, %d covers) in %.2fs',
                 report.playlists,
                 report.tracks,
                 report.added,
                 report.updated,
                 report.removed,
                 report.unchanged,
+                report.covers,
                 report.elapsed_s,
             )
             return report
 
-    def reconcile_playlist(self, folder_name: str, *, force: bool = False) -> ScanReport:
+    def reconcile_playlist(
+        self,
+        folder_name: str,
+        *,
+        force: bool = False,
+        refresh_covers: bool = False,
+    ) -> ScanReport:
         """Synchronise one playlist folder, leaving every other playlist untouched.
 
         Unlike :meth:`reconcile`, this neither discovers other folders nor
         marks them missing. It is meant for an explicit rescan of one folder
         after its files were retagged or renamed. With ``force`` every track is
-        re-read even when its size and mtime did not change.
+        re-read even when its size and mtime did not change. With
+        ``refresh_covers`` cached cover thumbnails for the scanned tracks are
+        removed so the web layer rebuilds them with the current rules.
         """
         with self._lock:
             started = time.monotonic()
@@ -97,20 +114,27 @@ class LibraryScanner:
             syncable = path == self.settings.target_dir
             playlist_id = self.store.upsert_playlist(folder_name, name, syncable=syncable)
             try:
-                self._scan_playlist(playlist_id, path, force=force, report=report)
+                self._scan_playlist(
+                    playlist_id,
+                    path,
+                    force=force,
+                    refresh_covers=refresh_covers,
+                    report=report,
+                )
             except Exception as exc:
                 logger.exception('Failed to scan playlist %s', path)
                 self.store.set_playlist_scanned(playlist_id, track_count=0, error=str(exc))
                 raise
             report.elapsed_s = time.monotonic() - started
             logger.info(
-                'Playlist %r reconciled: %d tracks (+%d ~%d -%d =%d) in %.2fs',
+                'Playlist %r reconciled: %d tracks (+%d ~%d -%d =%d, %d covers) in %.2fs',
                 name,
                 report.tracks,
                 report.added,
                 report.updated,
                 report.removed,
                 report.unchanged,
+                report.covers,
                 report.elapsed_s,
             )
             return report
@@ -165,6 +189,7 @@ class LibraryScanner:
         path: Path,
         *,
         force: bool,
+        refresh_covers: bool,
         report: ScanReport,
     ) -> None:
         existing = {track.filename: track for track in self.store.tracks_for_playlist(playlist_id)}
@@ -195,6 +220,9 @@ class LibraryScanner:
             number = track_number(filename) or position
             ordered.append((filename, number, position))
             old = existing.get(filename)
+            etag = etag_for_stat(size, mtime_ns)
+            if refresh_covers:
+                report.covers += self._invalidate_cover(file, etag, old.etag if old is not None else None)
             if old is not None and not force and old.size_bytes == size and old.mtime_ns == mtime_ns:
                 report.unchanged += 1
                 continue
@@ -214,7 +242,7 @@ class LibraryScanner:
                     'sample_rate_hz': metadata.sample_rate_hz,
                     'size_bytes': size,
                     'mtime_ns': mtime_ns,
-                    'etag': etag_for_stat(size, mtime_ns),
+                    'etag': etag,
                     'has_cover': metadata.has_cover,
                 },
             )
@@ -225,11 +253,35 @@ class LibraryScanner:
 
         missing = set(existing) - present
         if missing:
+            if refresh_covers:
+                for filename in missing:
+                    report.covers += self._invalidate_cover(path / filename, existing[filename].etag)
             report.removed += self.store.delete_tracks(playlist_id, missing)
         if ordered:
             self.store.update_positions(playlist_id, ordered)
         self.store.set_playlist_scanned(playlist_id, track_count=len(files))
         report.tracks += len(files)
+
+    def _invalidate_cover(self, audio_path: Path, etag: str, previous_etag: str | None = None) -> int:
+        """Remove cached cover files for one track and return how many were deleted."""
+        etags = {etag}
+        if previous_etag:
+            etags.add(previous_etag)
+        removed = 0
+        for value in etags:
+            for version in COVER_CACHE_VERSIONS:
+                key = cover_cache_key(audio_path, value, version=version)
+                for extension in COVER_CACHE_EXTENSIONS:
+                    cache_file = self.settings.covers_dir / f'{key}{extension}'
+                    try:
+                        cache_file.unlink()
+                    except FileNotFoundError:
+                        continue
+                    except OSError as exc:
+                        logger.warning('Could not remove cached cover %s: %s', cache_file, exc)
+                    else:
+                        removed += 1
+        return removed
 
     def track_path(self, playlist: PlaylistRow, track: TrackRow) -> Path:
         """Resolve a track to disk, refusing anything outside its playlist."""

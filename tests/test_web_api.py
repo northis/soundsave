@@ -12,6 +12,7 @@ pytest.importorskip('httpx')
 from fastapi.testclient import TestClient
 
 from soundsave.web.app import create_app
+from soundsave.web.cover_cache import COVER_CACHE_VERSION, cover_cache_key
 
 from .web_helpers import make_config, make_library, make_mp3
 
@@ -59,6 +60,7 @@ def test_playlists_and_tracks(root: Path) -> None:
         assert track['sample_rate_hz'] == 44100
         assert track['has_cover'] is True
         assert track['cover_url'].startswith('/api/playlists/')
+        assert f'?v={COVER_CACHE_VERSION}-' in track['cover_url']
         assert track['audio_url'].endswith(f'v={track["etag"]}')
 
 
@@ -153,7 +155,7 @@ def test_audio_range_head_and_download(root: Path) -> None:
         assert len(full.content) == track['size_bytes']
 
 
-def test_cover_is_served_as_webp(root: Path) -> None:
+def test_small_cover_is_served_unmodified(root: Path) -> None:
     with make_client(root) as client:
         main = client.get('/api/playlists').json()['playlists'][0]
         tracks = client.get(f'/api/playlists/{main["id"]}/tracks').json()['tracks']
@@ -162,8 +164,8 @@ def test_cover_is_served_as_webp(root: Path) -> None:
         response = client.get(covered['cover_url'])
 
         assert response.status_code == 200
-        assert response.headers['content-type'] == 'image/webp'
-        assert response.content.startswith(b'RIFF')
+        assert response.headers['content-type'] == 'image/png'
+        assert response.content.startswith(b'\x89PNG')
 
 
 def test_diag_upload_logs_client_journal(root: Path, caplog) -> None:
@@ -233,6 +235,27 @@ def test_playlist_refresh_rescans_only_that_playlist(root: Path) -> None:
         assert response.json()['report']['added'] == 1
         assert client.get(f'/api/playlists/{chill["id"]}/tracks').json()['total'] == 2
         assert client.get(f'/api/playlists/{main["id"]}/tracks').json()['total'] == 2
+
+
+def test_playlist_refresh_can_drop_cached_covers(root: Path) -> None:
+    audio = root / 'music' / 'Chill' / '01 - Someone - Something.mp3'
+    with make_client(root) as client:
+        chill = next(
+            playlist for playlist in client.get('/api/playlists').json()['playlists'] if playlist['name'] == 'Chill'
+        )
+        track = client.get(f'/api/playlists/{chill["id"]}/tracks').json()['tracks'][0]
+        cache_file = root / 'data' / 'covers' / f'{cover_cache_key(audio, track["etag"])}.webp'
+        cache_file.write_bytes(b'cached')
+
+        response = client.post(
+            f'/api/playlists/{chill["id"]}/refresh',
+            params={'covers': 'true'},
+            headers={'X-Soundsave-Request': '1'},
+        )
+
+        assert response.status_code == 200
+        assert response.json()['report']['covers'] == 1
+        assert not cache_file.exists()
 
 
 def test_startup_reconciles_database_with_disk(root: Path) -> None:

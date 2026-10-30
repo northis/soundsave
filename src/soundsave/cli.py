@@ -168,6 +168,11 @@ def build_parser() -> argparse.ArgumentParser:
         action='store_true',
         help='re-read metadata even when file size and mtime did not change',
     )
+    scan_parser.add_argument(
+        '--covers',
+        action='store_true',
+        help='drop cached cover thumbnails for the scanned playlists so they are rebuilt',
+    )
 
     snapshot_parser = subparsers.add_parser('snapshot', help='copy the web library database to DATA_DIR/backups')
     snapshot_parser.add_argument('--label', default='manual', help='snapshot label (default: manual)')
@@ -410,19 +415,20 @@ def _run_scan(config: Config, args: argparse.Namespace) -> int:
 
     try:
         if folder_name is None:
-            report = scanner.reconcile(force=args.force)
+            report = scanner.reconcile(force=args.force, refresh_covers=args.covers)
         else:
-            report = scanner.reconcile_playlist(folder_name, force=args.force)
+            report = scanner.reconcile_playlist(folder_name, force=args.force, refresh_covers=args.covers)
     except LibraryError as exc:
         raise ConfigError(str(exc)) from exc
     logger.info(
-        'Scanned %d playlists, %d tracks: +%d ~%d -%d =%d in %.2fs',
+        'Scanned %d playlists, %d tracks: +%d ~%d -%d =%d, %d covers in %.2fs',
         report.playlists,
         report.tracks,
         report.added,
         report.updated,
         report.removed,
         report.unchanged,
+        report.covers,
         report.elapsed_s,
     )
     return 0
