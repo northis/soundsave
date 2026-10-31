@@ -761,20 +761,6 @@ def _temporary_path(destination: Path) -> Path:
     return destination.with_name(f'.{destination.stem}.part{destination.suffix}')
 
 
-def _write_m3u8(playlist: Path, output_dir: Path, tracks: Sequence[ResolvedTrack], names: Sequence[str]) -> Path:
-    target = output_dir / f'{safe_component(playlist.stem)}.m3u8'
-    lines = ['#EXTM3U']
-    for track, name in zip(tracks, names, strict=True):
-        duration = round(track.duration) if track.duration else -1
-        label = ' - '.join(part for part in (track.artist, track.title) if part) or name
-        label = repair_mojibake(label.replace('\r', ' ').replace('\n', ' '))
-        lines.append(f'#EXTINF:{duration},{label}')
-        lines.append(name)
-    with target.open('w', encoding='utf-8', newline='\n') as handle:
-        handle.write('\n'.join(lines) + '\n')
-    return target
-
-
 def export_playlist(
     playlist: Path,
     output_dir: Path,
@@ -784,7 +770,6 @@ def export_playlist(
     dry_run: bool = False,
     ffmpeg: str | None = None,
     mappings: Sequence[tuple[str, str]] = (),
-    write_m3u8: bool = True,
     retag: bool = True,
 ) -> ExportReport:
     """Export *playlist* into *output_dir* and return a summary."""
@@ -818,14 +803,10 @@ def export_playlist(
     if not dry_run and any(track.lossless for track, _ in pending) and not ffmpeg_path:
         raise PlaylistError('ffmpeg is required to transcode lossless tracks; install it or pass --ffmpeg')
 
-    written_tracks: list[ResolvedTrack] = []
-    written_names: list[str] = []
-    for track, destination, name in zip(tracks, destinations, names, strict=True):
+    for track, destination in zip(tracks, destinations, strict=True):
         label = f'[{track.index}/{len(tracks)}] {destination.name}'
         if destination.exists() and not force:
             report.skipped += 1
-            written_tracks.append(track)
-            written_names.append(name)
             logger.info('%s already exists, skipping', label)
             continue
         if dry_run:
@@ -836,8 +817,6 @@ def export_playlist(
             else:
                 report.copied += 1
             report.files.append(destination)
-            written_tracks.append(track)
-            written_names.append(name)
             continue
         temporary = _temporary_path(destination)
         try:
@@ -872,10 +851,6 @@ def export_playlist(
             continue
         report.bytes_written += destination.stat().st_size
         report.files.append(destination)
-        written_tracks.append(track)
-        written_names.append(name)
         logger.info('%s <- %s', label, track.source.name)
 
-    if write_m3u8 and not dry_run:
-        _write_m3u8(playlist, Path(output_dir), written_tracks, written_names)
     return report

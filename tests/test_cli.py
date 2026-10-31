@@ -115,7 +115,6 @@ def test_export_parser() -> None:
     assert args.bitrate == 192
     assert args.mappings == ['D:/Music=/music']
     assert args.dry_run is True
-    assert args.no_m3u8 is False
     assert args.no_retag is False
 
 

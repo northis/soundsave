@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.4.1';
-import { CacheManager, formatBytes } from './cache.js?v=2.4.1';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.4.1';
+import { Player } from './player.js?v=2.7.1';
+import { CacheManager, formatBytes } from './cache.js?v=2.7.1';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.7.1';
 
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.7.1';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -451,6 +451,7 @@ function buildRow(track, index, height) {
   main.appendChild(artist);
   const meta = [
     `#${track.number}`,
+    track.year ? String(track.year) : '',
     track.format,
     formatBitrate(track.bitrate_kbps),
     formatSampleRate(track.sample_rate_hz),
@@ -462,6 +463,7 @@ function buildRow(track, index, height) {
   const albumCell = el('div', 'row-cell album', track.album || '—');
   if (track.album) albumCell.dataset.tooltip = track.album;
   row.appendChild(albumCell);
+  row.appendChild(el('div', 'row-cell year', track.year ? String(track.year) : '—'));
   const formatCell = el('div', 'row-cell format');
   formatCell.appendChild(el('span', 'format-badge', track.format || '—'));
   row.appendChild(formatCell);
@@ -533,7 +535,8 @@ function renderPreview(track) {
   const hasCover = Boolean(track.has_cover && track.cover_url);
   overlay.style.setProperty('--preview-art', hasCover ? `url("${track.cover_url}")` : 'none');
   $('cover-preview-title').textContent = track.title || 'Без названия';
-  $('cover-preview-artist').textContent = track.artist || 'Неизвестный исполнитель';
+  const artist = track.artist || 'Неизвестный исполнитель';
+  $('cover-preview-artist').textContent = track.year ? `${artist} · ${track.year}` : artist;
 }
 
 function setCover(container, track) {
@@ -650,7 +653,8 @@ function updatePlayerTrack(track) {
   $('next-btn').disabled = false;
   setCover(cover, track);
   $('player-title').textContent = track.title || 'Без названия';
-  $('player-artist').textContent = track.artist || 'Неизвестный исполнитель';
+  const artist = track.artist || 'Неизвестный исполнитель';
+  $('player-artist').textContent = track.year ? `${artist} · ${track.year}` : artist;
   $('player-cache').hidden = false;
   updatePlayerCache(track);
   updateSeek(player.currentTime, player.duration);

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS playlists (
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS tracks (
     title TEXT NOT NULL,
     artists TEXT NOT NULL,
     album TEXT,
+    year INTEGER,
     duration_s REAL,
     format TEXT NOT NULL,
     bitrate_kbps INTEGER,
@@ -94,6 +95,7 @@ class TrackRow:
     title: str
     artists: list[str]
     album: str | None
+    year: int | None
     duration_s: float | None
     format: str
     bitrate_kbps: int | None
@@ -134,6 +136,7 @@ def _track(row: sqlite3.Row) -> TrackRow:
         title=str(row['title']),
         artists=[str(item) for item in artists],
         album=row['album'],
+        year=int(row['year']) if row['year'] is not None else None,
         duration_s=row['duration_s'],
         format=str(row['format']),
         bitrate_kbps=row['bitrate_kbps'],
@@ -162,8 +165,21 @@ class LibraryStore:
             if version > SCHEMA_VERSION:
                 raise RuntimeError(f'Library database is newer than this app (schema {version})')
             connection.executescript(SCHEMA)
+            self._migrate(connection, version)
             connection.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
             connection.commit()
+
+    @staticmethod
+    def _migrate(connection: sqlite3.Connection, version: int) -> None:
+        """Apply schema migrations; track rows are derived from disk."""
+        if version >= 2:
+            return
+        columns = {str(row['name']) for row in connection.execute('PRAGMA table_info(tracks)').fetchall()}
+        if 'year' not in columns:
+            connection.execute('ALTER TABLE tracks ADD COLUMN year INTEGER')
+        # Existing rows have no year. Mark them as changed so the next
+        # reconciliation re-reads the files and fills the new column.
+        connection.execute('UPDATE tracks SET mtime_ns = -1')
 
     def list_playlists(self, *, include_missing: bool = False) -> list[PlaylistRow]:
         query = 'SELECT * FROM playlists'
@@ -264,6 +280,7 @@ class LibraryStore:
             'title',
             'artists',
             'album',
+            'year',
             'duration_s',
             'format',
             'bitrate_kbps',

@@ -64,6 +64,21 @@ def test_playlists_and_tracks(root: Path) -> None:
         assert track['audio_url'].endswith(f'v={track["etag"]}')
 
 
+def test_track_year_is_reported(root: Path) -> None:
+    make_library(root)
+    make_mp3(
+        root / 'music' / 'Main' / '0001. The Gathering - Saturnine.mp3',
+        'Saturnine',
+        'The Gathering',
+        date='1995-08-22',
+    )
+    with TestClient(create_app(make_config(root))) as client:
+        main = next(playlist for playlist in client.get('/api/playlists').json()['playlists'] if playlist['syncable'])
+        tracks = client.get(f'/api/playlists/{main["id"]}/tracks').json()['tracks']
+
+        assert tracks[0]['year'] == 1995
+
+
 def test_library_folder_is_the_main_playlist(root: Path) -> None:
     make_library(root)
     (root / 'music' / 'Main').rename(root / 'music' / 'Library')

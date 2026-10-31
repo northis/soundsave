@@ -236,6 +236,7 @@ class LibraryScanner:
                     'title': metadata.title,
                     'artists': metadata.artists,
                     'album': metadata.album,
+                    'year': metadata.year,
                     'duration_s': metadata.duration_s,
                     'format': metadata.format,
                     'bitrate_kbps': metadata.bitrate_kbps,

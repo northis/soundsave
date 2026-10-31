@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-11-01
+
+### Changed
+
+- `soundsave export` no longer writes a generated `.m3u8` into the output
+  folder; only audio files are produced. The `--no-m3u8` option is gone.
+
+### Added
+
+- The web player shows the track release year from the file's date/year tags
+  (MP3 `TDRC`/`TYER`, FLAC `DATE`, MP4 `©day`) in the track list, player and
+  cover preview. The library database schema is now v2 with a `tracks.year`
+  column; the first start after the upgrade re-reads the track index once to
+  fill it.
+
 ## [2.7.0] - 2026-10-30
 
 ### Added

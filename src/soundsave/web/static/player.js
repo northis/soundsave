@@ -1,4 +1,4 @@
-import { diag } from './diag.js?v=2.4.1';
+import { diag } from './diag.js?v=2.7.1';
 /* Audio playback, repeat modes and Media Session integration. */
 
 export class Player {

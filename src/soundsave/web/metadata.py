@@ -37,6 +37,7 @@ MIME_TYPES = {
     '.aif': 'audio/aiff',
 }
 _NUMBER_RE = re.compile(r'^(\d+)\s*[.\-_)]\s*')
+_YEAR_RE = re.compile(r'(?<!\d)(\d{4})(?!\d)')
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class LibraryMetadata:
     title: str
     artists: list[str]
     album: str | None
+    year: int | None
     duration_s: float | None
     format: str
     bitrate_kbps: int | None
@@ -96,6 +98,17 @@ def etag_for_stat(size: int, mtime_ns: int) -> str:
     return f'{size:x}-{mtime_ns:x}'
 
 
+def year_from_date(value: str | None) -> int | None:
+    """Return the four-digit year from a tag date, or ``None``."""
+    if not value:
+        return None
+    match = _YEAR_RE.search(value)
+    if match is None:
+        return None
+    year = int(match.group(1))
+    return year if 1000 <= year <= 9999 else None
+
+
 def _format_for(audio: object, path: Path) -> str:
     if isinstance(audio, MP3):
         return 'MP3'
@@ -131,6 +144,19 @@ def read_library_metadata(path: Path) -> LibraryMetadata:
     if not artists and filename_artist:
         artists = [filename_artist]
     album = tags.album if tags else None
+    year = year_from_date(tags.date if tags else None)
+    if year is None:
+        # read_tag_data() covers MP3/FLAC/MP4; other library formats (OGG,
+        # Opus, WAV, AIFF, AAC) can still expose a date through mutagen's
+        # easy interface.
+        try:
+            easy = MutagenFile(path, easy=True)
+            if easy is not None and easy.tags:
+                raw_date = easy.tags.get('date') or easy.tags.get('year')
+                if raw_date:
+                    year = year_from_date(str(raw_date[0]))
+        except Exception as exc:
+            logger.debug('Could not read date from %s: %s', path.name, exc)
     has_cover = bool(tags and tags.has_cover)
 
     duration_s: float | None = None
@@ -156,6 +182,7 @@ def read_library_metadata(path: Path) -> LibraryMetadata:
         title=title,
         artists=artists,
         album=album,
+        year=year,
         duration_s=duration_s,
         format=format_name,
         bitrate_kbps=bitrate_kbps,

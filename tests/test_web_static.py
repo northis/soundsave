@@ -81,12 +81,21 @@ def test_player_has_full_width_seek_shuffle_and_tooltips() -> None:
     assert 'grid-template-areas:\n    "track controls extra"\n    "seek seek seek"' in style
 
 
+def test_track_list_header_has_release_year() -> None:
+    index = (STATIC / 'index.html').read_text(encoding='utf-8')
+    app = (STATIC / 'app.js').read_text(encoding='utf-8')
+
+    assert 'year-col' in index
+    assert 'row-cell year' in app
+    assert 'track.year' in app
+
+
 def test_service_worker_caches_shell_and_audio() -> None:
     worker = (STATIC / 'sw.js').read_text(encoding='utf-8')
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v16' in worker
+    assert 'soundsave-shell-v17' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker

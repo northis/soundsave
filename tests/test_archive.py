@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from mutagen.id3 import APIC, ID3, PRIV, TALB, TIT2, TPE1, TXXX, USLT
+from mutagen.id3 import APIC, ID3, PRIV, TALB, TIT2, TPE1, TXXX, TYER, USLT
 from mutagen.mp4 import MP4
 
 from soundsave.archive import (
@@ -171,6 +171,16 @@ class TestGetImageType:
 
     def test_default(self) -> None:
         assert get_image_type(b'unknown') == 'image/jpeg'
+
+
+def test_reads_legacy_year_frame(tmp_path: Path) -> None:
+    path = tmp_path / '0001. Artist - Title.mp3'
+    make_mp3(path, bitrate_index=9, frame_length=417)
+    tags = ID3()
+    tags.add(TYER(encoding=3, text='1995'))
+    tags.save(path)
+
+    assert read_tag_data(path).date == '1995'
 
 
 class TestUpdateTagData:

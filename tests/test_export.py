@@ -215,7 +215,7 @@ def test_export_copies_lossy_and_transcodes_lossless(tmp_path: Path, monkeypatch
     assert len(calls) == 1
     assert calls[0]['number'] == 2
     assert calls[0]['bitrate'] == 256
-    assert (output / 'list.m3u8').is_file()
+    assert not (output / 'list.m3u8').exists()
 
 
 def test_export_transcodes_each_cue_track(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -420,9 +420,7 @@ def test_export_repairs_mojibake_in_names_tags_and_playlist(tmp_path: Path) -> N
     assert str(copied['title'][0]) == 'Москва'
     assert str(copied['artist'][0]) == 'Исполнитель'
     assert str(copied['date'][0]) == '1995'
-    playlist_text = (output / 'list.m3u8').read_text(encoding='utf-8')
-    assert ',Исполнитель - Москва' in playlist_text
-    assert '01. Исполнитель - Москва.mp3' in playlist_text
+    assert not (output / 'list.m3u8').exists()
 
 
 def test_transcode_passes_release_date(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

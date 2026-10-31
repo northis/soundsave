@@ -156,6 +156,12 @@ def _read_mp3_tags(path: Path, *, include_cover: bool = True) -> TagData:
     date_frames = tags.getall('TDRC')
     if date_frames and date_frames[0].text:
         data.date = str(date_frames[0].text[0])
+    else:
+        for frame_id in ('TYER', 'TORY'):
+            year_frames = tags.getall(frame_id)
+            if year_frames and year_frames[0].text:
+                data.date = str(year_frames[0].text[0])
+                break
     track_frames = tags.getall('TRCK')
     if track_frames and track_frames[0].text:
         data.track_number = str(track_frames[0].text[0])
@@ -196,7 +202,7 @@ def _read_flac_tags(path: Path, *, include_cover: bool = True) -> TagData:
         data.title = _first_tag(tags, 'title') or ''
         data.album = _first_tag(tags, 'album')
         data.album_artist = _first_tag(tags, 'albumartist')
-        data.date = _first_tag(tags, 'date')
+        data.date = _first_tag(tags, 'date') or _first_tag(tags, 'year')
         data.track_number = _first_tag(tags, 'tracknumber')
         data.genre = _first_tag(tags, 'genre')
         data.comment = _first_tag(tags, 'comment')

@@ -73,6 +73,7 @@ def _track_json(playlist_id: int, track: TrackRow) -> dict[str, object]:
         'artists': track.artists,
         'artist': ', '.join(track.artists),
         'album': track.album,
+        'year': track.year,
         'duration_s': track.duration_s,
         'format': track.format,
         'bitrate_kbps': track.bitrate_kbps,

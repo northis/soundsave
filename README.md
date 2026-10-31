@@ -274,15 +274,15 @@ soundsave export "Road trip.fpl" --output ./export --map "D:\Music=/mnt/music"
   (`album.ape|subsong=N`, as written by foobar2000) are understood.
 * Playlists and CUE sheets are decoded automatically as UTF-8, UTF-16 or
   Windows-1251. Mojibake from old cp1251 tags is repaired on the fly for file
-  names, copied-file tags and the generated `.m3u8`.
+  names and copied-file tags.
 * Files are named `<playlist number>. <artist> - <title>.<ext>`, with leading
   zeros wide enough to keep the folder sortable (`07. …`, `007. …`). Illegal
   file-name characters are replaced with `_`.
 * Every new file gets the playlist position as its track number; copied lossy
   files are retagged too unless `--no-retag` is passed. Retagging also repairs
   mojibake in title, artist, album and date.
-* An `<playlist>.m3u8` is written next to the files as UTF-8 unless
-  `--no-m3u8` is used.
+* Only audio files are written to the output folder; the input playlist is not
+  copied there.
 * `--force` overwrites existing files; otherwise they are skipped. `--dry-run`
   only prints the plan. `--map FROM=TO` rewrites a path prefix, which is useful
   when the playlist was saved on another machine.
@@ -353,7 +353,8 @@ Every immediate subfolder is a playlist; files inside are expected at the top
 level (nested directories are ignored). `TARGET_DIR`/`MAIN_PLAYLIST` selects the
 single syncable playlist. The SQLite index is reconciled with disk on container
 startup, after sync, when you press "Refresh", and per playlist with
-`soundsave scan --playlist NAME`.
+`soundsave scan --playlist NAME`. Upgrading from 2.7.0 re-reads the track index
+once on the first start to fill the new release-year column.
 
 Docker quick start:
 
@@ -385,6 +386,8 @@ The player:
 * streams files with HTTP Range, so seeking and fast starts work;
 * shows embedded covers up to 1000 px (smaller covers are served unchanged,
   larger ones are scaled down and cached) or a placeholder;
+* shows the release year from the file's date/year tag in the track list, player
+  and cover preview;
 * supports play/pause, previous/next, a full-width horizontal seek bar, shuffle
   within the current playlist, repeat off/all/one and volume;
 * sorts by playlist number, title or artist and keeps the playing track in the

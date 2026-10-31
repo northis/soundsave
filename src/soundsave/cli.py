@@ -136,7 +136,6 @@ def build_parser() -> argparse.ArgumentParser:
         metavar='FROM=TO',
         help='rewrite a path prefix (repeatable)',
     )
-    export_parser.add_argument('--no-m3u8', action='store_true', help='do not write a playlist next to the files')
     export_parser.add_argument(
         '--no-retag',
         action='store_true',
@@ -340,7 +339,6 @@ def _run_export(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         ffmpeg=str(args.ffmpeg) if args.ffmpeg else None,
         mappings=_parse_mappings(args.mappings),
-        write_m3u8=not args.no_m3u8,
         retag=not args.no_retag,
     )
     logger.info(

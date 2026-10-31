@@ -10,7 +10,7 @@ from soundsave.archive import read_tag_data
 from soundsave.web.cover_cache import cover_cache_key
 from soundsave.web.db import LibraryStore
 from soundsave.web.library import LibraryError, LibraryScanner
-from soundsave.web.metadata import read_library_metadata
+from soundsave.web.metadata import read_library_metadata, year_from_date
 from soundsave.web.settings import WebSettings
 
 from .web_helpers import COVER, make_config, make_library, make_mp3
@@ -177,6 +177,35 @@ def test_metadata_falls_back_to_filename(root: Path) -> None:
     assert metadata.artists == ['Fallback Artist']
     assert metadata.format == 'MP3'
     assert metadata.duration_s is not None
+    assert metadata.year is None
+
+
+def test_track_year_is_read_from_file_tags(root: Path) -> None:
+    path = root / 'music' / 'Main' / '0001. A - One.mp3'
+    make_mp3(path, 'One', 'A', date='1995-08-22')
+    scanner, store = make_scanner(root)
+
+    scanner.reconcile()
+
+    main = store.get_syncable_playlist()
+    assert main is not None
+    track = store.tracks_for_playlist(main.id)[0]
+    assert track.year == 1995
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'),
+    [
+        ('1995', 1995),
+        ('1995-08-22', 1995),
+        ('22.08.1995', 1995),
+        ('', None),
+        (None, None),
+        ('no year', None),
+    ],
+)
+def test_year_from_date(value: str | None, expected: int | None) -> None:
+    assert year_from_date(value) == expected
 
 
 def test_reconcile_playlist_leaves_other_playlists_untouched(root: Path) -> None:

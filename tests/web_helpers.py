@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from mutagen.id3 import APIC, ID3, TALB, TIT2, TPE1
+from mutagen.id3 import APIC, ID3, TALB, TDRC, TIT2, TPE1
 
 from soundsave.config import Config
 
@@ -21,6 +21,7 @@ def make_mp3(
     artist: str = 'Artist',
     *,
     album: str | None = 'Album',
+    date: str | None = None,
     cover: bytes | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -31,6 +32,8 @@ def make_mp3(
     tags.add(TPE1(encoding=3, text=[artist]))
     if album:
         tags.add(TALB(encoding=3, text=album))
+    if date:
+        tags.add(TDRC(encoding=3, text=date))
     if cover:
         tags.add(APIC(encoding=3, mime='image/png', type=3, data=cover))
     tags.save(path)
