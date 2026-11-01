@@ -148,7 +148,7 @@ function renderPlaylistSelect() {
   for (const playlist of state.playlists) {
     const option = document.createElement('option');
     option.value = String(playlist.id);
-    option.textContent = `${playlist.name}${playlist.readonly ? ' · только чтение' : ''} (${playlist.track_count})`;
+    option.textContent = `${playlist.name}${playlist.readonly ? '' : ' · ✎'} (${playlist.track_count})`;
     select.appendChild(option);
   }
   if (state.playlistId) select.value = String(state.playlistId);
