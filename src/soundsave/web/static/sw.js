@@ -1,6 +1,6 @@
 /* Soundsave service worker: app shell, API fallback, covers and audio cache. */
 
-const SHELL_CACHE = 'soundsave-shell-v17';
+const SHELL_CACHE = 'soundsave-shell-v18';
 const AUDIO_CACHE = 'soundsave-audio-v1';
 const COVER_CACHE = 'soundsave-covers-v2';
 const API_CACHE = 'soundsave-api-v1';
@@ -8,11 +8,11 @@ const KEEP = new Set([SHELL_CACHE, AUDIO_CACHE, COVER_CACHE, API_CACHE]);
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=2.7.1',
-  '/static/app.js?v=2.7.1',
-  '/static/player.js?v=2.7.1',
-  '/static/cache.js?v=2.7.1',
-  '/static/diag.js?v=2.7.1',
+  '/static/style.css?v=2.7.2',
+  '/static/app.js?v=2.7.2',
+  '/static/player.js?v=2.7.2',
+  '/static/cache.js?v=2.7.2',
+  '/static/diag.js?v=2.7.2',
   '/favicon.svg',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',

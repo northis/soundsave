@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-11-02
+
+### Fixed
+
+- The theme button now changes the theme on the first click when the current
+  preference is "system": it switches to the opposite of the system theme
+  instead of first switching to the matching explicit theme. The full
+  system/light/dark choice remains in Settings.
+
+### Changed
+
+- The playlist picker marks the editable (syncable) playlist with `✎`.
+
 ## [2.7.1] - 2026-11-01
 
 ### Changed

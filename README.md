@@ -396,7 +396,8 @@ The player:
   a tooltip with the full text when even that does not fit;
 * uses a compact bottom panel on desktop and a two-row panel on mobile;
 * opens a large cover preview of the playing track when its row is clicked;
-* follows the device theme by default; system/light/dark is switchable;
+* follows the device theme by default; the top-bar button toggles light/dark
+  and Settings offers the full system/light/dark choice;
 * shows the running release tag and short commit in the top-right corner
   (also in Settings on narrow screens), linked to the GitHub release and
   commit.

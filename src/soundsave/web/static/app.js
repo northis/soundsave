@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.7.1';
-import { CacheManager, formatBytes } from './cache.js?v=2.7.1';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.7.1';
+import { Player } from './player.js?v=2.7.2';
+import { CacheManager, formatBytes } from './cache.js?v=2.7.2';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.7.2';
 
-const APP_VERSION = '2.7.1';
+const APP_VERSION = '2.7.2';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -120,9 +120,14 @@ function setTheme(preference) {
 }
 
 function cycleTheme() {
-  const order = ['system', 'light', 'dark'];
   const current = themePreference();
-  setTheme(order[(order.indexOf(current) + 1) % order.length]);
+  if (current === 'system') {
+    // The first click must change the visible theme even when the system theme
+    // matches one of the explicit choices; system itself stays in Settings.
+    setTheme(resolvedTheme('system') === 'dark' ? 'light' : 'dark');
+    return;
+  }
+  setTheme(current === 'dark' ? 'light' : 'dark');
 }
 
 /* ----------------------------- playlist ----------------------------- */
