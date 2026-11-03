@@ -265,11 +265,12 @@ soundsave export "Road trip.fpl" --output ./export --map "D:\Music=/mnt/music"
 * Lossy sources (`.mp3`, AAC `.m4a`, `.ogg`, `.opus`, …) are copied as they
   are; their audio is never re-encoded. ALAC in `.m4a`/`.mp4` is detected by
   its codec and treated as lossless, while AAC `.m4a` stays a lossy copy.
-* Lossless sources (`.flac`, `.ape`, `.wav`, `.aiff`, ALAC, …) are transcoded
-  to AAC in an `.m4a` container with `ffmpeg`, 256 kbps by default. The release
-  date is preserved from the source tags and, for CUE albums, from `REM DATE`
-  or `REM YEAR`.
-* `.ape`/`.flac` albums described by a CUE sheet are split at the sheet's
+* Lossless sources (`.flac`, `.ape`, `.wav`, `.aiff`, WavPack `.wv`, ALAC, …)
+  are transcoded to AAC in an `.m4a` container with `ffmpeg`, 256 kbps by
+  default. The release date, album artist and track tags are preserved,
+  including the APEv2 `Album Artist`/`Track` keys used by WavPack, Monkey's
+  Audio and TAK; for CUE albums the date comes from `REM DATE` or `REM YEAR`.
+* `.ape`/`.flac`/`.wv` albums described by a CUE sheet are split at the sheet's
   `INDEX` times. Both a `.cue` file in the playlist and subsong items
   (`album.ape|subsong=N`, as written by foobar2000) are understood.
 * Playlists and CUE sheets are decoded automatically as UTF-8, UTF-16 or

@@ -470,3 +470,98 @@ def test_is_lossless_checks_the_mp4_codec(tmp_path: Path, monkeypatch: pytest.Mo
 
 def test_is_lossless_treats_aac_m4a_as_lossy() -> None:
     assert is_lossless(Path(__file__).with_name('fixtures') / 'silence.m4a') is False
+
+
+def test_is_lossless_recognizes_wavpack() -> None:
+    assert is_lossless(Path('album.wv')) is True
+    assert is_lossless(Path('ALBUM.WV')) is True
+
+
+def test_export_transcodes_wavpack_to_m4a(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'one.wv').write_bytes(b'wvpk')
+    playlist = source / 'list.m3u8'
+    playlist.write_text('#EXTM3U\n#EXTINF:200,Band - Song\none.wv\n', encoding='utf-8')
+
+    calls: list[dict[str, object]] = []
+
+    def fake_transcode(source_path: Path, destination: Path, **kwargs: object) -> None:
+        calls.append({'source': source_path, 'destination': destination, **kwargs})
+        destination.write_bytes(b'transcoded')
+
+    monkeypatch.setattr('soundsave.export._transcode', fake_transcode)
+    output = tmp_path / 'out'
+
+    report = export_playlist(playlist, output, retag=False, ffmpeg='ffmpeg')
+
+    assert report.ok
+    assert report.transcoded == 1
+    assert (output / '01. Band - Song.m4a').read_bytes() == b'transcoded'
+    assert calls[0]['source'] == source / 'one.wv'
+
+
+def test_export_splits_a_wavpack_album_from_cue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / 'source'
+    source.mkdir()
+    (source / 'album.wv').write_bytes(b'wvpk')
+    (source / 'album.cue').write_text(
+        'PERFORMER "Singer"\n'
+        'FILE "album.wv" WAVE\n'
+        '  TRACK 01 AUDIO\n'
+        '    TITLE "First"\n'
+        '    INDEX 01 00:00:00\n'
+        '  TRACK 02 AUDIO\n'
+        '    TITLE "Second"\n'
+        '    INDEX 01 01:00:00\n',
+        encoding='utf-8',
+    )
+    playlist = source / 'list.m3u8'
+    playlist.write_text('#EXTM3U\nalbum.cue\n', encoding='utf-8')
+
+    def fake_transcode(source_path: Path, destination: Path, **kwargs: object) -> None:
+        destination.write_bytes(b'transcoded')
+
+    monkeypatch.setattr('soundsave.export._transcode', fake_transcode)
+    output = tmp_path / 'out'
+
+    report = export_playlist(playlist, output, ffmpeg='ffmpeg')
+
+    assert report.ok
+    assert report.transcoded == 2
+    assert (output / '01. Singer - First.m4a').is_file()
+    assert (output / '02. Singer - Second.m4a').is_file()
+
+
+def test_wavpack_apev2_tags_fill_the_export_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / 'album.wv'
+    source.write_bytes(b'wvpk')
+
+    class Info:
+        length = 212.5
+
+    class Audio:
+        tags = {
+            'Title': ['Song'],
+            'Artist': ['Band'],
+            'Album': ['Record'],
+            'Album Artist': ['Various Artists'],
+            'Track': ['7/12'],
+            'Date': ['1998'],
+        }
+        info = Info()
+
+    monkeypatch.setattr('soundsave.export.MutagenFile', lambda *args, **kwargs: Audio())
+
+    tracks = resolve_tracks(parse_m3u8('album.wv\n', tmp_path))
+
+    assert len(tracks) == 1
+    track = tracks[0]
+    assert track.title == 'Song'
+    assert track.artist == 'Band'
+    assert track.album == 'Record'
+    assert track.album_artist == 'Various Artists'
+    assert track.original_track == 7
+    assert track.date == '1998'
+    assert track.duration == pytest.approx(212.5)
+    assert track.lossless is True

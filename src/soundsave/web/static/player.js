@@ -1,8 +1,8 @@
-import { diag } from './diag.js?v=2.7.2';
+import { diag } from './diag.js?v=2.8.0';
 /* Audio playback, repeat modes and Media Session integration. */
 
 export class Player {
-  constructor({ onTrackChange, onTime, onState, onError, resolveSource, loadBlob } = {}) {
+  constructor({ onTrackChange, onTime, onState, onError, onUserPause, resolveSource, loadBlob } = {}) {
     this.audio = new Audio();
     this.audio.preload = 'auto';
     this.audio.setAttribute('playsinline', '');
@@ -42,6 +42,11 @@ export class Player {
     this.onTime = onTime || (() => {});
     this.onState = onState || (() => {});
     this.onError = onError || (() => {});
+    this.onUserPause = onUserPause || (() => {});
+    // What the user asked for, as opposed to `audio.paused`: Android may pause
+    // the element itself while the app is in the background, and that pause
+    // must not cancel the resume-on-visible behaviour.
+    this.intent = 'paused';
     this.audio.volume = this.volume;
     this._wireAudio();
     this._wireMediaSession();
@@ -81,7 +86,7 @@ export class Player {
     if (!('mediaSession' in navigator)) return;
     const actions = {
       play: () => { diag('session:play'); this.play(); },
-      pause: () => { diag('session:pause'); this.pause(); },
+      pause: () => { diag('session:pause'); this.pause({ explicit: true }); },
       previoustrack: () => this.previous(),
       nexttrack: () => this.next(),
       seekbackward: (details) => this.seek(this.audio.currentTime - (details.seekOffset || 10)),
@@ -127,7 +132,7 @@ export class Player {
     if (!track) return;
     if (this.track && this.track.id === track.id) {
       if (this.audio.paused) this.play();
-      else this.pause();
+      else this.pause({ explicit: true });
       return;
     }
     this.setTrack(track, { autoplay: true, startAt });
@@ -139,6 +144,7 @@ export class Player {
       return;
     }
     diag('player:play', { track: this.track.id });
+    this.intent = 'playing';
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     const result = this.audio.play();
     if (result && typeof result.catch === 'function') {
@@ -146,15 +152,19 @@ export class Player {
     }
   }
 
-  pause() {
+  pause({ explicit = false } = {}) {
     diag('player:pause');
+    if (explicit) {
+      this.intent = 'paused';
+      this.onUserPause();
+    }
     this.audio.pause();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }
 
   toggle() {
     if (this.audio.paused) this.play();
-    else this.pause();
+    else this.pause({ explicit: true });
   }
 
   // Android throttles the network of a page whose screen is off even when its

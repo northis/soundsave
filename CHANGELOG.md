@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-03
+
+### Added
+
+- `soundsave export` now handles WavPack (`.wv`) as a lossless source: the
+  tracks are decoded by ffmpeg and written as AAC `.m4a`, and WavPack albums
+  described by a CUE sheet are split like `.ape`/`.flac` albums. WavPack APEv2
+  tags are mapped to the common names, so `Album Artist`, `Track`,
+  `Date`/`Year` and the embedded cover survive the conversion.
+
+### Fixed
+
+- Pausing playback and hiding the app no longer makes the music resume when
+  the app is opened again. An explicit pause (the play button, Space, a row
+  tap, the lock-screen controls) cancels the resume-on-visible behaviour,
+  including a pause made while the app was in the background and a pause
+  during the short Wi-Fi recovery delay.
+
 ## [2.7.2] - 2026-11-02
 
 ### Fixed

@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=2.7.2';
-import { CacheManager, formatBytes } from './cache.js?v=2.7.2';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.7.2';
+import { Player } from './player.js?v=2.8.0';
+import { CacheManager, formatBytes } from './cache.js?v=2.8.0';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=2.8.0';
 
-const APP_VERSION = '2.7.2';
+const APP_VERSION = '2.8.0';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -28,6 +28,7 @@ const state = {
   installPrompt: null,
   lastPositionSave: 0,
   wasPlayingBeforeHidden: false,
+  resumeTimer: null,
   previewOpen: false,
 };
 
@@ -751,6 +752,16 @@ function onPlayerState({ playing, repeat, volume, muted }) {
   if (typeof volume === 'number' || typeof muted === 'boolean') updateVolume();
 }
 
+// A pause requested by the user (the play button, Space, a row tap or the
+// lock-screen controls) must win over the resume-on-visible behaviour below.
+function onUserPause() {
+  state.wasPlayingBeforeHidden = false;
+  if (state.resumeTimer) {
+    clearTimeout(state.resumeTimer);
+    state.resumeTimer = null;
+  }
+}
+
 function currentTrack() {
   return state.sorted.find((track) => track.id === state.currentId) || state.tracks.find((track) => track.id === state.currentId) || null;
 }
@@ -969,7 +980,7 @@ function setupEvents() {
   window.addEventListener('pagehide', savePosition);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      state.wasPlayingBeforeHidden = Boolean(player && player.playing);
+      state.wasPlayingBeforeHidden = Boolean(player && player.playing && player.intent === 'playing');
       savePosition();
       if (cacheManager) cacheManager.cancelActive();
       return;
@@ -978,8 +989,12 @@ function setupEvents() {
     state.wasPlayingBeforeHidden = false;
     if (wasPlaying) {
       // Give Android a moment to bring Wi-Fi/DNS back after the screen wakes.
-      setTimeout(() => {
-        if (player && player.audio.paused) player.play();
+      // The user may pause during this window (for example from the lock
+      // screen), so the timer is cancelled by `onUserPause` and the intent is
+      // checked again before playback starts.
+      state.resumeTimer = setTimeout(() => {
+        state.resumeTimer = null;
+        if (player && player.intent === 'playing' && player.audio.paused && !document.hidden) player.play();
       }, 400);
     }
   });
@@ -1295,6 +1310,7 @@ async function init() {
     onTime,
     onState: onPlayerState,
     onError: (message) => toast(message, { error: true }),
+    onUserPause,
     resolveSource: playbackSource,
     loadBlob: loadTrackBlob,
   });

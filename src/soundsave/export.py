@@ -1,8 +1,9 @@
 """Export foobar2000 playlists into a folder for containers and portable players.
 
-Lossy sources are copied unchanged; lossless sources are transcoded to AAC in
-an MP4 container (``.m4a``) with ``ffmpeg``. ``.ape``/``.flac`` albums described
-by a CUE sheet are split into separate tracks using the sheet's ``INDEX`` times.
+Lossy sources are copied unchanged; lossless sources (including WavPack
+``.wv``) are transcoded to AAC in an MP4 container (``.m4a``) with ``ffmpeg``.
+``.ape``/``.flac``/``.wv`` albums described by a CUE sheet are split into
+separate tracks using the sheet's ``INDEX`` times.
 
 Output files are named ``<playlist number>. <artist> - <title>.<ext>`` with
 leading zeros wide enough to keep the folder sortable.
@@ -34,6 +35,8 @@ FPL_V2_MAGIC = bytes.fromhex('003759db444d564e8034c62aba89a6b9')
 _FPL_CHUNK = 68
 
 PLAYLIST_SUFFIXES = frozenset({'.fpl', '.m3u', '.m3u8'})
+# Lossless inputs are transcoded to AAC; WavPack (`.wv`) belongs here and its
+# APEv2 tags are mapped to the common names in `_read_tags`.
 LOSSLESS_SUFFIXES = frozenset({'.flac', '.ape', '.wav', '.aiff', '.aif', '.alac', '.wv', '.tta', '.dsf', '.dff'})
 MP4_SUFFIXES = frozenset({'.m4a', '.mp4'})
 
@@ -44,6 +47,20 @@ _RESERVED = frozenset(
     {'CON', 'PRN', 'AUX', 'NUL'} | {f'COM{i}' for i in range(1, 10)} | {f'LPT{i}' for i in range(1, 10)},
 )
 _SUBSONG = re.compile(r'^(?P<path>.*)\|subsong=(?P<index>\d+)$', re.IGNORECASE)
+
+# ID3, Vorbis, MP4 and EasyMP3 expose single-word tag names, while APEv2
+# (WavPack, Monkey's Audio, TAK) writes human-readable ones such as
+# "Album Artist" or "Track". Map both spellings to the internal names.
+_TAG_ALIASES = {
+    'title': 'title',
+    'artist': 'artist',
+    'album': 'album',
+    'albumartist': 'albumartist',
+    'track': 'tracknumber',
+    'tracknumber': 'tracknumber',
+    'date': 'date',
+    'year': 'year',
+}
 
 _CUE_FILE = re.compile(r'^FILE\s+(?:"(?P<quoted>[^"]+)"|(?P<plain>\S+))(?:\s+\S+)?\s*$', re.IGNORECASE)
 _CUE_TRACK = re.compile(r'^TRACK\s+(\d+)\s+AUDIO\s*$', re.IGNORECASE)
@@ -502,6 +519,11 @@ def _match_cue_track(entry: PlaylistEntry, sheet: CueSheet, occurrences: int) ->
 # --------------------------------------------------------------------------
 
 
+def _tag_key(name: str) -> str | None:
+    """Return the internal name for a container's tag key, if it is used."""
+    return _TAG_ALIASES.get(re.sub(r'[\s_-]+', '', name.strip().lower()))
+
+
 def _read_tags(path: Path) -> tuple[dict[str, str], float | None]:
     if not path.is_file():
         return {}, None
@@ -514,13 +536,22 @@ def _read_tags(path: Path) -> tuple[dict[str, str], float | None]:
     tags: dict[str, str] = {}
     raw_tags = getattr(audio, 'tags', None)
     if raw_tags:
-        for key in ('title', 'artist', 'album', 'albumartist', 'tracknumber', 'date', 'year'):
+        # Mutagen's tag containers may iterate as ``(key, value)`` pairs, so
+        # ask for the keys explicitly.
+        for raw_key in raw_tags.keys():  # noqa: SIM118
+            key = _tag_key(str(raw_key))
+            if key is None or key in tags:
+                continue
             try:
-                value = raw_tags.get(key)
+                value = raw_tags.get(raw_key)
             except (KeyError, ValueError):
                 continue
-            if value:
-                tags[key] = repair_mojibake(str(value[0]))
+            if not value:
+                continue
+            first = value if isinstance(value, str) else value[0]
+            text = str(first).strip()
+            if text:
+                tags[key] = repair_mojibake(text)
     if 'date' not in tags and 'year' in tags:
         tags['date'] = tags['year']
     length = getattr(getattr(audio, 'info', None), 'length', None)

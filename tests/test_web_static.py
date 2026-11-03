@@ -102,7 +102,7 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v18' in worker
+    assert 'soundsave-shell-v19' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker
@@ -126,6 +126,22 @@ def test_service_worker_caches_shell_and_audio() -> None:
     assert 'loadBlob: loadTrackBlob' in (STATIC / 'app.js').read_text(encoding='utf-8')
     assert 'cancelActive' in cache
     assert "visibilityState !== 'visible'" in cache
+
+
+def test_user_pause_wins_over_resume_when_the_page_becomes_visible() -> None:
+    app = (STATIC / 'app.js').read_text(encoding='utf-8')
+    player = (STATIC / 'player.js').read_text(encoding='utf-8')
+
+    assert "this.intent = 'paused'" in player
+    assert "this.intent = 'playing'" in player
+    assert 'this.pause({ explicit: true })' in player
+    assert 'onUserPause' in player
+    assert 'onUserPause,' in app
+    assert 'function onUserPause' in app
+    assert "player.playing && player.intent === 'playing'" in app
+    assert "player.intent === 'playing' && player.audio.paused && !document.hidden" in app
+    assert 'state.resumeTimer = setTimeout' in app
+    assert 'clearTimeout(state.resumeTimer)' in app
 
 
 def test_docker_files_mount_music_and_data() -> None:
