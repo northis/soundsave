@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-11-03
+
+### Added
+
+- The web player now stores one cached cover file per unique cover inside a
+  playlist. Covers are identified by the SHA-256 hash of the embedded image
+  bytes and remembered in the library database, so an album cover used by
+  every track takes one file instead of one per track. The same cover in
+  different playlists still gets separate files, keeping playlist rescans
+  independent. Legacy per-track cover files are removed on the first start.
+
+### Changed
+
+- The cover cache layout is now version 3; cover URLs change so browsers pick
+  up the rebuilt files. `scan --covers` (and `POST .../refresh?covers=true`)
+  removes the shared files of the scanned playlist and obsolete per-track
+  files left by older releases.
+
 ## [2.8.0] - 2026-11-03
 
 ### Added

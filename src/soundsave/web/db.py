@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS playlists (
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS tracks (
     mtime_ns INTEGER NOT NULL,
     etag TEXT NOT NULL,
     has_cover INTEGER NOT NULL DEFAULT 0,
+    cover_hash TEXT,
     UNIQUE(playlist_id, filename)
 );
 
@@ -104,6 +105,7 @@ class TrackRow:
     mtime_ns: int
     etag: str
     has_cover: bool
+    cover_hash: str | None
 
 
 def _playlist(row: sqlite3.Row) -> PlaylistRow:
@@ -145,6 +147,7 @@ def _track(row: sqlite3.Row) -> TrackRow:
         mtime_ns=int(row['mtime_ns']),
         etag=str(row['etag']),
         has_cover=bool(row['has_cover']),
+        cover_hash=str(row['cover_hash']) if row['cover_hash'] is not None else None,
     )
 
 
@@ -172,14 +175,17 @@ class LibraryStore:
     @staticmethod
     def _migrate(connection: sqlite3.Connection, version: int) -> None:
         """Apply schema migrations; track rows are derived from disk."""
-        if version >= 2:
+        if version >= SCHEMA_VERSION:
             return
         columns = {str(row['name']) for row in connection.execute('PRAGMA table_info(tracks)').fetchall()}
         if 'year' not in columns:
             connection.execute('ALTER TABLE tracks ADD COLUMN year INTEGER')
-        # Existing rows have no year. Mark them as changed so the next
-        # reconciliation re-reads the files and fills the new column.
-        connection.execute('UPDATE tracks SET mtime_ns = -1')
+        if 'cover_hash' not in columns:
+            connection.execute('ALTER TABLE tracks ADD COLUMN cover_hash TEXT')
+        if version < 2:
+            # Existing rows have no year. Mark them as changed so the next
+            # reconciliation re-reads the files and fills the new column.
+            connection.execute('UPDATE tracks SET mtime_ns = -1')
 
     def list_playlists(self, *, include_missing: bool = False) -> list[PlaylistRow]:
         query = 'SELECT * FROM playlists'
@@ -289,6 +295,7 @@ class LibraryStore:
             'mtime_ns',
             'etag',
             'has_cover',
+            'cover_hash',
         )
         data = {
             'playlist_id': playlist_id,
@@ -306,6 +313,12 @@ class LibraryStore:
                 f'ON CONFLICT(playlist_id, filename) DO UPDATE SET {updates}',
                 [data[column] for column in columns],
             )
+            connection.commit()
+
+    def set_cover_hash(self, track_id: int, cover_hash: str) -> None:
+        """Remember the content hash of a track's embedded cover."""
+        with closing(connect(self.path)) as connection:
+            connection.execute('UPDATE tracks SET cover_hash = ? WHERE id = ?', (cover_hash, track_id))
             connection.commit()
 
     def delete_tracks(self, playlist_id: int, filenames: set[str]) -> int:

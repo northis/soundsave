@@ -64,6 +64,23 @@ def test_schema_v2_adds_year_and_forces_one_rescan(tmp_path: Path) -> None:
         assert connection.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION
 
 
+def test_schema_v3_adds_cover_hash_without_a_rescan(tmp_path: Path) -> None:
+    database = tmp_path / 'library.sqlite3'
+    with sqlite3.connect(database) as connection:
+        connection.executescript(OLD_SCHEMA)
+        connection.execute('ALTER TABLE tracks ADD COLUMN year INTEGER')
+        connection.execute('PRAGMA user_version = 2')
+
+    LibraryStore(database).init()
+
+    with sqlite3.connect(database) as connection:
+        columns = {str(row[1]) for row in connection.execute('PRAGMA table_info(tracks)')}
+        assert 'cover_hash' in columns
+        assert connection.execute('SELECT cover_hash FROM tracks').fetchone()[0] is None
+        assert connection.execute('SELECT mtime_ns FROM tracks').fetchone()[0] == 123
+        assert connection.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION
+
+
 def test_migration_does_not_rescan_again(tmp_path: Path) -> None:
     database = tmp_path / 'library.sqlite3'
     with sqlite3.connect(database) as connection:

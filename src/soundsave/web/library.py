@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .cover_cache import COVER_CACHE_EXTENSIONS, COVER_CACHE_VERSIONS, cover_cache_key
+from .cover_cache import COVER_CACHE_EXTENSIONS, is_legacy_cover_key, playlist_cover_scope
 from .db import LibraryStore, PlaylistRow, TrackRow
 from .metadata import (
     etag_for_stat,
@@ -66,6 +66,7 @@ class LibraryScanner:
                 try:
                     self._scan_playlist(
                         playlist_id,
+                        folder_name,
                         path,
                         force=force,
                         refresh_covers=refresh_covers,
@@ -116,6 +117,7 @@ class LibraryScanner:
             try:
                 self._scan_playlist(
                     playlist_id,
+                    folder_name,
                     path,
                     force=force,
                     refresh_covers=refresh_covers,
@@ -186,12 +188,15 @@ class LibraryScanner:
     def _scan_playlist(
         self,
         playlist_id: int,
+        folder_name: str,
         path: Path,
         *,
         force: bool,
         refresh_covers: bool,
         report: ScanReport,
     ) -> None:
+        if refresh_covers:
+            report.covers += self._invalidate_covers(folder_name)
         existing = {track.filename: track for track in self.store.tracks_for_playlist(playlist_id)}
         files: list[tuple[Path, int, int]] = []
         for entry in path.iterdir():
@@ -221,8 +226,6 @@ class LibraryScanner:
             ordered.append((filename, number, position))
             old = existing.get(filename)
             etag = etag_for_stat(size, mtime_ns)
-            if refresh_covers:
-                report.covers += self._invalidate_cover(file, etag, old.etag if old is not None else None)
             if old is not None and not force and old.size_bytes == size and old.mtime_ns == mtime_ns:
                 report.unchanged += 1
                 continue
@@ -245,6 +248,11 @@ class LibraryScanner:
                     'mtime_ns': mtime_ns,
                     'etag': etag,
                     'has_cover': metadata.has_cover,
+                    # The file is unchanged only when its etag is unchanged;
+                    # then the old cover hash is still valid and saves a tag
+                    # read on the next cover request. A forced rescan re-reads
+                    # the cover even when the etag looks unchanged.
+                    'cover_hash': (old.cover_hash if not force and old is not None and old.etag == etag else None),
                 },
             )
             if old is None:
@@ -254,34 +262,38 @@ class LibraryScanner:
 
         missing = set(existing) - present
         if missing:
-            if refresh_covers:
-                for filename in missing:
-                    report.covers += self._invalidate_cover(path / filename, existing[filename].etag)
             report.removed += self.store.delete_tracks(playlist_id, missing)
         if ordered:
             self.store.update_positions(playlist_id, ordered)
         self.store.set_playlist_scanned(playlist_id, track_count=len(files))
         report.tracks += len(files)
 
-    def _invalidate_cover(self, audio_path: Path, etag: str, previous_etag: str | None = None) -> int:
-        """Remove cached cover files for one track and return how many were deleted."""
-        etags = {etag}
-        if previous_etag:
-            etags.add(previous_etag)
+    def _invalidate_covers(self, folder_name: str) -> int:
+        """Remove cached covers for one playlist plus obsolete per-track files.
+
+        Version 3 files are named after the playlist scope, so they can be
+        removed without knowing which tracks still use them. Files left by
+        versions 1 and 2 carry no playlist information and are dropped once.
+        """
+        prefix = f'p{playlist_cover_scope(folder_name)}-'
         removed = 0
-        for value in etags:
-            for version in COVER_CACHE_VERSIONS:
-                key = cover_cache_key(audio_path, value, version=version)
-                for extension in COVER_CACHE_EXTENSIONS:
-                    cache_file = self.settings.covers_dir / f'{key}{extension}'
-                    try:
-                        cache_file.unlink()
-                    except FileNotFoundError:
-                        continue
-                    except OSError as exc:
-                        logger.warning('Could not remove cached cover %s: %s', cache_file, exc)
-                    else:
-                        removed += 1
+        for cache_file in self.settings.covers_dir.iterdir():
+            if not cache_file.is_file():
+                continue
+            is_image = cache_file.suffix.lower() in COVER_CACHE_EXTENSIONS
+            current = is_image and cache_file.stem.startswith(prefix)
+            legacy = is_image and is_legacy_cover_key(cache_file.stem)
+            temporary = cache_file.name.startswith('.') and cache_file.name.endswith('.tmp')
+            if not (current or legacy or temporary):
+                continue
+            try:
+                cache_file.unlink()
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                logger.warning('Could not remove cached cover %s: %s', cache_file, exc)
+            else:
+                removed += 1
         return removed
 
     def track_path(self, playlist: PlaylistRow, track: TrackRow) -> Path:

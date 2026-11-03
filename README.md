@@ -247,7 +247,8 @@ where `MUSIC_DIR` itself is the single playlist, use `--dir` or plain `scan`
 instead of `--playlist`. `--force` re-reads tags and cover presence even when
 the file size and mtime did not change, which is useful after copying files
 with preserved timestamps. `--covers` removes the cached cover thumbnails of
-the scanned playlists, so the web player rebuilds them with the current rules.
+the scanned playlists (including files left by the older per-track layout), so
+the web player rebuilds them with the current rules.
 The same operations are available over HTTP as `POST /api/playlists/{id}/refresh`
 (add `?force=true` and/or `?covers=true`).
 
@@ -386,7 +387,9 @@ The player:
 
 * streams files with HTTP Range, so seeking and fast starts work;
 * shows embedded covers up to 1000 px (smaller covers are served unchanged,
-  larger ones are scaled down and cached) or a placeholder;
+  larger ones are scaled down and cached) or a placeholder; identical covers
+  inside one playlist share a single cache file, so an album cover is stored
+  once;
 * shows the release year from the file's date/year tag in the track list, player
   and cover preview;
 * supports play/pause, previous/next, a full-width horizontal seek bar, shuffle

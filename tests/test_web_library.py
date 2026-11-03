@@ -7,7 +7,7 @@ import pytest
 from mutagen.id3 import ID3, TIT2
 
 from soundsave.archive import read_tag_data
-from soundsave.web.cover_cache import cover_cache_key
+from soundsave.web.cover_cache import cover_cache_key, cover_content_key, playlist_cover_scope
 from soundsave.web.db import LibraryStore
 from soundsave.web.library import LibraryError, LibraryScanner
 from soundsave.web.metadata import read_library_metadata, year_from_date
@@ -311,14 +311,19 @@ def test_reconcile_playlist_drops_cached_covers_on_request(root: Path) -> None:
 
     current = scanner.settings.covers_dir / f'{cover_cache_key(path, track.etag)}.webp'
     legacy = scanner.settings.covers_dir / f'{cover_cache_key(path, track.etag, version=1)}.webp'
+    shared = scanner.settings.covers_dir / (
+        f'{cover_content_key(playlist_cover_scope(main.folder_name), "a" * 64)}.webp'
+    )
     current.write_bytes(b'current')
     legacy.write_bytes(b'legacy')
+    shared.write_bytes(b'shared')
 
     report = scanner.reconcile_playlist('Main', refresh_covers=True)
 
-    assert report.covers == 2
+    assert report.covers == 3
     assert not current.exists()
     assert not legacy.exists()
+    assert not shared.exists()
 
 
 def test_reconcile_playlist_rejects_subfolders_in_flat_mode(root: Path) -> None:

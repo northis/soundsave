@@ -121,6 +121,9 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
         _warn_if_main_folder_is_new(resolved)
         resolved.ensure()
         store.init()
+        removed = covers.cleanup_legacy()
+        if removed:
+            logger.info('Removed %d obsolete cover cache files', removed)
         scanner.reconcile()
         logger.info(
             'Web library: music=%s, main playlist=%r, sync=%s',
@@ -279,9 +282,15 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
             path = scanner.track_path(playlist, track)
         except LibraryError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        result = covers.get(path, track.etag)
+        result = covers.get(
+            path,
+            playlist_folder=playlist.folder_name,
+            cover_hash=track.cover_hash,
+        )
         if result is None:
             raise HTTPException(status_code=404, detail='No embedded cover')
+        if result.cover_hash != track.cover_hash:
+            store.set_cover_hash(track.id, result.cover_hash)
         return FileResponse(
             result.path,
             media_type=result.media_type,

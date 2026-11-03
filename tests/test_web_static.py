@@ -102,7 +102,7 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v19' in worker
+    assert 'soundsave-shell-v20' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker

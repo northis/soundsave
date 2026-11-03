@@ -13,8 +13,9 @@ from fastapi.testclient import TestClient
 
 from soundsave.web.app import create_app
 from soundsave.web.cover_cache import COVER_CACHE_VERSION, cover_cache_key
+from soundsave.web.db import LibraryStore
 
-from .web_helpers import make_config, make_library, make_mp3
+from .web_helpers import COVER, make_config, make_library, make_mp3
 
 
 def make_client(
@@ -250,6 +251,38 @@ def test_playlist_refresh_rescans_only_that_playlist(root: Path) -> None:
         assert response.json()['report']['added'] == 1
         assert client.get(f'/api/playlists/{chill["id"]}/tracks').json()['total'] == 2
         assert client.get(f'/api/playlists/{main["id"]}/tracks').json()['total'] == 2
+
+
+def test_identical_covers_share_one_file_per_playlist(root: Path) -> None:
+    make_library(root)
+    make_mp3(
+        root / 'music' / 'Main' / '0003. The Gathering - Third.mp3',
+        'Third',
+        'The Gathering',
+        cover=COVER,
+    )
+    make_mp3(
+        root / 'music' / 'Chill' / '02 - Someone - Another.mp3',
+        'Another',
+        'Someone',
+        cover=COVER,
+    )
+
+    with TestClient(create_app(make_config(root))) as client:
+        playlists = {playlist['name']: playlist for playlist in client.get('/api/playlists').json()['playlists']}
+        main = playlists['Main']
+        for name in ('Main', 'Chill'):
+            tracks = client.get(f'/api/playlists/{playlists[name]["id"]}/tracks').json()['tracks']
+            for track in tracks:
+                if track['has_cover']:
+                    assert client.get(track['cover_url']).status_code == 200
+
+    cache_files = [path for path in (root / 'data' / 'covers').iterdir() if path.is_file()]
+    assert len(cache_files) == 2
+    assert all(path.name.startswith('p') for path in cache_files)
+    store = LibraryStore(root / 'data' / 'library.sqlite3')
+    tracks = store.tracks_for_playlist(main['id'])
+    assert all(track.cover_hash for track in tracks if track.has_cover)
 
 
 def test_playlist_refresh_can_drop_cached_covers(root: Path) -> None:
