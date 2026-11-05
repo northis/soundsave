@@ -18,6 +18,7 @@ from .discogs_catalog import DiscogsCatalog
 from .downloader import DownloadError
 from .export import PlaylistError, export_playlist
 from .providers.base import ProviderError
+from .providers.yandex import YandexProvider
 from .providers.zvuk import ZvukProvider
 from .quality import QualityPolicy, TargetFormat
 from .sync import run_sync
@@ -72,6 +73,12 @@ def build_parser() -> argparse.ArgumentParser:
     upgrade_parser = subparsers.add_parser('upgrade', help='replace tracks below the target quality')
     _add_scan_arguments(upgrade_parser)
     upgrade_parser.add_argument('--apply', action='store_true', help='actually download and replace files')
+    upgrade_parser.add_argument(
+        '--source',
+        choices=['zvuk', 'yandex'],
+        default='zvuk',
+        help='download source (default: zvuk)',
+    )
     upgrade_parser.add_argument(
         '--policy',
         choices=[policy.value for policy in QualityPolicy],
@@ -252,7 +259,7 @@ def _run_audit(config: Config, args: argparse.Namespace) -> int:
 def _run_upgrade(config: Config, args: argparse.Namespace) -> int:
     policy = QualityPolicy(args.policy)
     apply = bool(args.apply) and policy is not QualityPolicy.REPORT
-    provider = ZvukProvider(config.require_zvuk())
+    provider = YandexProvider(config.yandex_token) if args.source == 'yandex' else ZvukProvider(config.require_zvuk())
     options = UpgradeOptions(
         apply=apply,
         policy=policy,

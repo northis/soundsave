@@ -18,7 +18,8 @@ dependency, and the repository contains only the application code.
   Zvuk and reports what could be replaced. Nothing is changed.
 * **`upgrade`** — does the same, and with `--apply` downloads a 320 kbps MP3
   (or FLAC) stream, verifies it, copies the original tags, backs up the old
-  file and atomically replaces it.
+  file and atomically replaces it. `--source yandex` downloads from Yandex
+  Music instead of Zvuk.
 * **`tags`** — checks the archive against Yandex Music (and, optionally,
   Discogs) and, with `--apply`, fills only missing tags, cover art and lyrics in
   the existing files. It never downloads audio, never renames files and never
@@ -27,9 +28,10 @@ dependency, and the repository contains only the application code.
   subfolders. It streams the original MP3/AAC/FLAC files with HTTP Range, keeps
   a SQLite index, and can run the Yandex sync button for the one main playlist.
 
-Zvuk is used for **real 320 kbps MP3 and FLAC** streams because Yandex Music
-currently serves at most 192 kbps MP3. YouTube Music is not used: its ceiling
-is 256 kbps AAC/Opus, so it cannot produce a true 320 kbps MP3.
+Zvuk is used for **real 320 kbps MP3 and FLAC** streams. `upgrade --source yandex`
+can also download a 320 kbps MP3 from Yandex Music when its API offers one;
+Yandex lossless streams are not supported. YouTube Music is not used: its
+ceiling is 256 kbps AAC/Opus, so it cannot produce a true 320 kbps MP3.
 
 ## Requirements
 
@@ -38,7 +40,7 @@ is 256 kbps AAC/Opus, so it cannot produce a true 320 kbps MP3.
 * A Discogs account and personal access token for the `tags` Discogs fallback
   (optional; without it Discogs is skipped)
 * A Zvuk account with a paid subscription and a token for the `sync` 320 kbps
-  fallback and for `audit`/`upgrade`
+  fallback, for `audit` and for `upgrade --source zvuk` (the default)
 * `ffmpeg` only if you ask for `--format mp3` and a candidate has FLAC but no
   320 kbps MP3 stream
 
@@ -80,7 +82,7 @@ All settings live in `.env` (or in the environment). See
 | `DATA_HOST_DIR` | Docker only | Host path mounted at `/app/data` |
 | `SOUNDSAVE_HOST`, `SOUNDSAVE_PORT` | no | Web player bind address/port (default `127.0.0.1:8765`) |
 | `SOUNDSAVE_BIND_ADDR` | Docker only | Published interface (default `0.0.0.0`) |
-| `ZVUK_TOKEN` | for the `sync` fallback and `audit`/`upgrade` | Zvuk token from `https://zvuk.com/api/tiny/profile` |
+| `ZVUK_TOKEN` | for the `sync` fallback, `audit` and `upgrade --source zvuk` (the default) | Zvuk token from `https://zvuk.com/api/tiny/profile` |
 | `DISCOGS_TOKEN` | for the `tags` Discogs fallback | Discogs personal access token |
 | `DISCOGS_DELAY` | no | Minimum pause between Discogs requests in seconds (default 2.0) |
 | `MAX_DOWNLOADS` | no | New tracks per `sync` run or web sync button press (default 20) |
@@ -106,6 +108,9 @@ soundsave upgrade --limit 20
 
 # Replace the first 20 tracks with 320 kbps MP3
 soundsave upgrade --apply --limit 20
+
+# Download the replacements from Yandex Music instead of Zvuk
+soundsave upgrade --apply --source yandex
 
 # Keep FLAC where it is available
 soundsave upgrade --apply --format flac

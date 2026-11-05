@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `soundsave upgrade` now accepts `--source yandex` and downloads replacement
+  streams from Yandex Music instead of Zvuk. Yandex replacements are limited to
+  320 kbps MP3; `--format flac` still requires the Zvuk source.
+
 ## [2.9.0] - 2026-11-03
 
 ### Added

@@ -184,6 +184,50 @@ class TestTagsParser:
         assert args.playlist == 'Chill'
 
 
+class TestUpgradeParser:
+    def test_default_source_is_zvuk(self) -> None:
+        args = build_parser().parse_args(['upgrade'])
+
+        assert args.command == 'upgrade'
+        assert args.source == 'zvuk'
+        assert args.apply is False
+
+    def test_source_yandex(self) -> None:
+        args = build_parser().parse_args(['upgrade', '--apply', '--source', 'yandex'])
+
+        assert args.source == 'yandex'
+        assert args.apply is True
+
+    def test_source_yandex_uses_yandex_provider(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        config = make_config(tmp_path, yandex_token='token')
+        captured: dict[str, Any] = {}
+
+        def fake_run_upgrade(config: Config, provider: object, options: object) -> list[object]:
+            captured['provider'] = provider
+            return []
+
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_, **__: config)
+        monkeypatch.setattr('soundsave.cli.YandexProvider', lambda token: ('yandex', token))
+        monkeypatch.setattr('soundsave.cli.run_upgrade', fake_run_upgrade)
+
+        assert main(['upgrade', '--apply', '--source', 'yandex']) == 0
+        assert captured['provider'] == ('yandex', 'token')
+
+    def test_source_yandex_requires_token(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        config = make_config(tmp_path, yandex_token=None)
+        monkeypatch.setattr('soundsave.cli.Config.load', lambda *_, **__: config)
+
+        assert main(['upgrade', '--apply', '--source', 'yandex']) == 1
+
+
 class FakeDiscogsCatalog:
     instances: list[FakeDiscogsCatalog] = []
 
