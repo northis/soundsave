@@ -7,11 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-07
+
 ### Added
 
 - `soundsave upgrade` now accepts `--source yandex` and downloads replacement
   streams from Yandex Music instead of Zvuk. Yandex replacements are limited to
   320 kbps MP3; `--format flac` still requires the Zvuk source.
+
+### Changed
+
+- Docker Compose now takes the host music root and data folder from `MUSIC_DIR`
+  and `DATA_DIR`, the same variables a local run uses; the container keeps the
+  fixed `/music` and `/app/data` paths. `MUSIC_HOST_DIR` and `DATA_HOST_DIR`
+  were removed: rename them to `MUSIC_DIR`/`DATA_DIR` and run
+  `docker compose up -d` so the container is recreated with the new mounts.
 
 ## [2.9.0] - 2026-11-03
 

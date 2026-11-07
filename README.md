@@ -74,12 +74,10 @@ All settings live in `.env` (or in the environment). See
 |---|---|---|
 | `YANDEX_TOKEN` | for `sync` and `tags` | Yandex Music token (`API_KEY` is accepted as an alias) |
 | `PLAYLIST_URL` | for `sync`; optional for `tags` | Playlist URL, e.g. `https://music.yandex.ru/users/USER/playlists/3` |
-| `TARGET_DIR` | yes, or use `MUSIC_DIR` | Archive directory; also the main playlist folder |
-| `MUSIC_DIR` | for the web player | Library root; every immediate subfolder is a playlist |
-| `MAIN_PLAYLIST` | with `MUSIC_DIR` | Folder name of the one playlist that gets the sync button |
-| `DATA_DIR` | no | SQLite index and cover cache (default `TARGET_DIR/.soundsave`) |
-| `MUSIC_HOST_DIR` | Docker only | Host path mounted at `/music` (Compose does not expand `~`) |
-| `DATA_HOST_DIR` | Docker only | Host path mounted at `/app/data` |
+| `MUSIC_DIR` | yes, or use `TARGET_DIR` | Library root; every immediate subfolder is a playlist. Also the host path Docker Compose mounts at `/music` |
+| `MAIN_PLAYLIST` | with `MUSIC_DIR` | Folder name of the one playlist that gets the sync button; empty for a flat library |
+| `TARGET_DIR` | no | Explicit archive folder; overrides `MUSIC_DIR` + `MAIN_PLAYLIST` |
+| `DATA_DIR` | no | SQLite index and cover cache (default `.soundsave` in the main playlist locally; Compose mounts it at `/app/data`) |
 | `SOUNDSAVE_HOST`, `SOUNDSAVE_PORT` | no | Web player bind address/port (default `127.0.0.1:8765`) |
 | `SOUNDSAVE_BIND_ADDR` | Docker only | Published interface (default `0.0.0.0`) |
 | `ZVUK_TOKEN` | for the `sync` fallback, `audit` and `upgrade --source zvuk` (the default) | Zvuk token from `https://zvuk.com/api/tiny/profile` |
@@ -367,14 +365,20 @@ Docker quick start:
 
 ```bash
 cp .env.template .env
-# edit MUSIC_DIR, MUSIC_HOST_DIR, MAIN_PLAYLIST, PLAYLIST_URL, YANDEX_TOKEN
+# edit MUSIC_DIR (an absolute host path), MAIN_PLAYLIST, PLAYLIST_URL,
+# YANDEX_TOKEN. DATA_DIR is optional and defaults to ./data.
 docker compose up -d --build
 # open http://localhost:8765 (or the HTTPS Cloudflare hostname for PWA install)
 ```
 
-`MUSIC_HOST_DIR` and `DATA_HOST_DIR` are Compose-only host paths; the container
-uses `/music` and `/app/data`. Docker Compose does not expand `~`, so use an
-absolute path or a path relative to the repository.
+`MUSIC_DIR` and `DATA_DIR` in `.env` are host paths and are the same variables
+a local run uses. Compose mounts them at `/music` and `/app/data`; those
+container paths are fixed and never configured. Compose does not expand `~`, so
+use an absolute path with forward slashes (`C:/Music`). The drive must be
+available when the container starts: a bind mount of a missing drive stays
+empty, so restart the container once the drive appears. After editing `.env`
+run `docker compose up -d` (it recreates the container); `docker compose
+restart` keeps the old mounts and environment.
 
 The sync button is shown only for the main playlist. It downloads new tracks
 from Yandex Music up to `MAX_DOWNLOADS` and **does not use Zvuk**: if Yandex

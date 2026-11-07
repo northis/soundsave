@@ -102,7 +102,7 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v20' in worker
+    assert 'soundsave-shell-v21' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker
@@ -148,9 +148,11 @@ def test_docker_files_mount_music_and_data() -> None:
     compose = (REPO / 'docker-compose.yml').read_text(encoding='utf-8')
     dockerfile = (REPO / 'Dockerfile').read_text(encoding='utf-8')
 
-    assert '${MUSIC_HOST_DIR:-./music}:/music' in compose
-    assert '${DATA_HOST_DIR:-./data}:/app/data' in compose
+    assert '${MUSIC_DIR:?set MUSIC_DIR in .env to the host music folder}:/music' in compose
+    assert '${DATA_DIR:-./data}:/app/data' in compose
     assert 'MUSIC_DIR: /music' in compose
+    assert 'MUSIC_HOST_DIR' not in compose
+    assert 'DATA_HOST_DIR' not in compose
     assert 'MAIN_PLAYLIST' in compose
     assert 'soundsave", "serve' in dockerfile
     assert 'EXPOSE 8765' in dockerfile

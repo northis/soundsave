@@ -1,5 +1,6 @@
 # Soundsave web player + SQLite index. All user data stays on the host:
-# ./music (playlist folders) and ./data (database, cover cache).
+# MUSIC_DIR (playlist folders) and DATA_DIR (database, cover cache). Both are
+# the same variables a local run uses; the container paths are fixed.
 services:
   soundsave:
     build:
@@ -15,8 +16,10 @@ services:
     ports:
       - "${SOUNDSAVE_BIND_ADDR:-0.0.0.0}:${SOUNDSAVE_PORT:-8765}:8765"
     environment:
+      # Fixed paths inside the container. The MUSIC_DIR/DATA_DIR values in
+      # .env are host paths and are only used by the volumes below.
       MUSIC_DIR: /music
-      MAIN_PLAYLIST: "${MAIN_PLAYLIST:-Main}"
+      MAIN_PLAYLIST: "${MAIN_PLAYLIST-Main}"
       DATA_DIR: /app/data
       PLAYLIST_URL: "${PLAYLIST_URL:-}"
       YANDEX_TOKEN: "${YANDEX_TOKEN:-}"
@@ -25,13 +28,12 @@ services:
       MAX_DOWNLOADS: "${MAX_DOWNLOADS:-20}"
       SOUNDSAVE_DELAY: "${SOUNDSAVE_DELAY:-1.0}"
     volumes:
-      # Host paths. MUSIC_HOST_DIR/DATA_HOST_DIR are only used by compose;
-      # the paths inside the container are fixed to /music and /app/data.
-      # Playlist folders: the main playlist is writable for Yandex sync; the
-      # other folders are read-only at the application level.
-      - "${MUSIC_HOST_DIR:-./music}:/music"
+      # Host paths from .env. Playlist folders: the main playlist is writable
+      # for Yandex sync; the other folders are read-only at the application
+      # level.
+      - "${MUSIC_DIR:?set MUSIC_DIR in .env to the host music folder}:/music"
       # library.sqlite3 and the extracted cover thumbnails.
-      - "${DATA_HOST_DIR:-./data}:/app/data"
+      - "${DATA_DIR:-./data}:/app/data"
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 10s

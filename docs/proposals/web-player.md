@@ -116,6 +116,6 @@ later if needed.
 - PWA install requires HTTPS. Cloudflare Access must bypass
   `/manifest.webmanifest` and `/static/icons/*` (and `/sw.js` if the proxy
   blocks it); API and audio stay protected.
-- Docker mounts `MUSIC_HOST_DIR` at `/music` and `DATA_HOST_DIR` at
-  `/app/data`. Compose does not expand `~`.
+- Docker mounts `MUSIC_DIR` at `/music` and `DATA_DIR` at `/app/data`.
+  Compose does not expand `~`.
 - The web image does not include `ffmpeg` and does not need `ZVUK_TOKEN`.
