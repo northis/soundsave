@@ -374,11 +374,18 @@ docker compose up -d --build
 `MUSIC_DIR` and `DATA_DIR` in `.env` are host paths and are the same variables
 a local run uses. Compose mounts them at `/music` and `/app/data`; those
 container paths are fixed and never configured. Compose does not expand `~`, so
-use an absolute path with forward slashes (`C:/Music`). The drive must be
-available when the container starts: a bind mount of a missing drive stays
-empty, so restart the container once the drive appears. After editing `.env`
+use an absolute path with forward slashes (`C:/Music`). After editing `.env`
 run `docker compose up -d` (it recreates the container); `docker compose
 restart` keeps the old mounts and environment.
+
+The drive must be available when the container starts. An encrypted drive
+(BitLocker, VeraCrypt) counts as missing until it is unlocked. Docker may
+autostart before that and create an empty mount, which stays empty even when
+the drive appears later; restarting only the container can keep the stale
+mount. In that case restart Docker Desktop (or the Docker daemon), then run
+`docker compose up -d --force-recreate`. The startup log line
+`Library reconciled: ...` shows what the container actually sees: a single
+`MAIN_PLAYLIST` folder and 0 tracks usually mean the mount is empty.
 
 The sync button is shown only for the main playlist. It downloads new tracks
 from Yandex Music up to `MAX_DOWNLOADS` and **does not use Zvuk**: if Yandex
