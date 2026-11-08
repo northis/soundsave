@@ -138,6 +138,7 @@ audit.csv
 # Web player data and local music library
 data/
 music/
+backup/
 
 # Local browser screenshots
 .openchamber/
