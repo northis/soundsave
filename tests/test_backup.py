@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import zipfile
@@ -26,16 +27,20 @@ def make_config(tmp_path: Path) -> Config:
     )
 
 
-def make_track(path: Path, mtime: str) -> None:
+def make_track(path: Path, mtime: str, data: bytes = b'track') -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b'track')
+    path.write_bytes(data)
     moment = datetime.fromisoformat(mtime).astimezone()
     os.utime(path, (moment.timestamp(), moment.timestamp()))
 
 
+def read_state(config: Config) -> dict:
+    return json.loads((config.backup_dir / STATE_FILE).read_text(encoding='utf-8'))
+
+
 def rewrite_cutoff(config: Config, cutoff: str) -> None:
     state_path = config.backup_dir / STATE_FILE
-    payload = json.loads(state_path.read_text(encoding='utf-8'))
+    payload = read_state(config)
     payload['last_backup'] = cutoff
     state_path.write_text(json.dumps(payload), encoding='utf-8')
 
@@ -69,8 +74,22 @@ def test_first_backup_takes_only_files_newer_than_since(tmp_path: Path) -> None:
         assert bundle.namelist() == ['Main/new.mp3']
         assert bundle.getinfo('Main/new.mp3').compress_type == zipfile.ZIP_STORED
         assert DELETE_LIST not in bundle.namelist()
-    state = json.loads((config.backup_dir / STATE_FILE).read_text(encoding='utf-8'))
-    assert state['files'] == ['Main/new.mp3', 'Main/old.mp3']
+    state = read_state(config)
+    assert state['version'] == 2
+    assert sorted(state['files']) == ['Main/new.mp3', 'Main/old.mp3']
+    assert state['files']['Main/new.mp3']['sha256'] == hashlib.sha256(b'track').hexdigest()
+    assert state['files']['Main/old.mp3']['sha256'] is None
+
+
+def test_state_is_readable_utf8(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    make_track(config.music_dir / 'Main' / 'Группа - Песня.mp3', '2026-01-01')
+
+    run_backup(config, since='2025-01-01')
+
+    raw = (config.backup_dir / STATE_FILE).read_text(encoding='utf-8')
+    assert 'Группа - Песня.mp3' in raw
+    assert '\\u' not in raw
 
 
 def test_later_backups_take_changed_and_new_files(tmp_path: Path) -> None:
@@ -78,7 +97,7 @@ def test_later_backups_take_changed_and_new_files(tmp_path: Path) -> None:
     make_track(config.music_dir / 'Main' / 'keep.mp3', '2024-01-01')
     run_backup(config, since='2023-01-01')
     rewrite_cutoff(config, '2025-01-01T00:00:00Z')
-    make_track(config.music_dir / 'Main' / 'keep.mp3', '2026-01-01')
+    make_track(config.music_dir / 'Main' / 'keep.mp3', '2026-01-01', data=b'changed')
     make_track(config.music_dir / 'Main' / 'added.mp3', '2024-06-01')
 
     archive = run_backup(config)
@@ -86,6 +105,54 @@ def test_later_backups_take_changed_and_new_files(tmp_path: Path) -> None:
     assert archive is not None
     with zipfile.ZipFile(archive) as bundle:
         assert sorted(bundle.namelist()) == ['Main/added.mp3', 'Main/keep.mp3']
+
+
+def test_content_change_with_same_size_is_caught(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    track = config.music_dir / 'Main' / 'keep.mp3'
+    make_track(track, '2024-01-01', data=b'aaaa')
+    run_backup(config, since='2023-01-01')
+    make_track(track, '2026-01-01', data=b'bbbb')
+
+    archive = run_backup(config)
+
+    assert archive is not None
+    with zipfile.ZipFile(archive) as bundle:
+        assert bundle.read('Main/keep.mp3') == b'bbbb'
+
+
+def test_touch_without_content_change_writes_no_archive(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    track = config.music_dir / 'Main' / 'keep.mp3'
+    make_track(track, '2024-01-01')
+    run_backup(config, since='2023-01-01')
+    make_track(track, '2026-01-01')
+
+    assert run_backup(config) is None
+    assert len(list(config.backup_dir.glob('*.zip'))) == 1
+
+
+def test_state_from_3_1_is_migrated(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    track = config.music_dir / 'Main' / 'old.mp3'
+    make_track(track, '2024-06-01')
+    config.backup_dir.mkdir()
+    (config.backup_dir / STATE_FILE).write_text(
+        json.dumps({'last_backup': '2025-01-01T00:00:00Z', 'files': ['Main/old.mp3']}),
+        encoding='utf-8',
+    )
+
+    assert run_backup(config) is None
+    state = read_state(config)
+    assert state['version'] == 2
+    assert state['files']['Main/old.mp3']['sha256'] is None
+
+    make_track(track, '2025-06-01', data=b'changed')
+    archive = run_backup(config)
+
+    assert archive is not None
+    with zipfile.ZipFile(archive) as bundle:
+        assert bundle.read('Main/old.mp3') == b'changed'
 
 
 def test_deleted_files_are_listed_in_the_archive(tmp_path: Path) -> None:

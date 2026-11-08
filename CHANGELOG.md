@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-08
+
+### Added
+
+- `soundsave backup` stores a SHA-256 hash for every archived track in
+  `state.json` and checks it when a file's size or mtime changed. Touching a
+  file no longer packs it again, while a content change with the same size is
+  still caught. State files from 3.1 are upgraded on the next run.
+
+### Changed
+
+- `soundsave backup` writes `state.json` as readable UTF-8 without escaping
+  non-ASCII characters, so Cyrillic and other track names stay readable.
+
 ## [3.1.0] - 2026-11-08
 
 ### Added

@@ -176,13 +176,15 @@ from Yandex Music only.
 `soundsave backup` writes an incremental ZIP archive to `BACKUP_DIR` for the
 tracks under `MUSIC_DIR` (or `TARGET_DIR`). The first run needs
 `--since YYYY-MM-DD`: only files modified after that date are included. The
-run time is stored in `state.json` next to the archives, and later runs use it
-as the cutoff. Files added or modified after it are packed without compression;
-paths keep their library-relative layout (`Main/0001. Artist - Title.mp3`). When
-files known to the previous backup are gone, the archive also contains
-`deleted.txt` with one path per line. The list is omitted on the first backup
-and when nothing was deleted. A run with no changes and no deletions writes no
-archive but still records the date.
+run time and a SHA-256 hash of every archived file are stored in `state.json`
+next to the archives. Later runs compare size and mtime, and hash the file only
+when those differ: a touched file is not packed again, while a changed file is
+still caught even when its size stays the same. New files are packed without
+compression; paths keep their library-relative layout
+(`Main/0001. Artist - Title.mp3`). When files known to the previous backup are
+gone, the archive also contains `deleted.txt` with one path per line. The list
+is omitted on the first backup and when nothing was deleted. A run with no
+changes and no deletions writes no archive but still records the date.
 
 ### Quality policies
 

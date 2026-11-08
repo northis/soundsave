@@ -8,11 +8,11 @@ const KEEP = new Set([SHELL_CACHE, AUDIO_CACHE, COVER_CACHE, API_CACHE]);
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=3.1.0',
-  '/static/app.js?v=3.1.0',
-  '/static/player.js?v=3.1.0',
-  '/static/cache.js?v=3.1.0',
-  '/static/diag.js?v=3.1.0',
+  '/static/style.css?v=3.2.0',
+  '/static/app.js?v=3.2.0',
+  '/static/player.js?v=3.2.0',
+  '/static/cache.js?v=3.2.0',
+  '/static/diag.js?v=3.2.0',
   '/favicon.svg',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
