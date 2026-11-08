@@ -12,6 +12,7 @@ from pathlib import Path
 
 from . import __version__
 from .archive import ArchiveError
+from .backup import run_backup
 from .catalogs import CompositeCatalog, MetadataCatalog
 from .config import Config, ConfigError
 from .discogs_catalog import DiscogsCatalog
@@ -183,6 +184,16 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot_parser = subparsers.add_parser('snapshot', help='copy the web library database to DATA_DIR/backups')
     snapshot_parser.add_argument('--label', default='manual', help='snapshot label (default: manual)')
     snapshot_parser.add_argument('--keep', type=int, default=10, help='number of snapshots to keep (default: 10)')
+
+    backup_parser = subparsers.add_parser(
+        'backup',
+        help='pack tracks added or changed since the previous backup into an uncompressed ZIP in BACKUP_DIR',
+    )
+    backup_parser.add_argument(
+        '--since',
+        metavar='DATE',
+        help='first backup only: consider files modified after this date (YYYY-MM-DD or an ISO datetime)',
+    )
     return parser
 
 
@@ -513,6 +524,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_serve(config, args)
         if args.command == 'snapshot':
             return _run_snapshot(config, args)
+        if args.command == 'backup':
+            run_backup(config, since=args.since)
+            return 0
     except (ConfigError, ProviderError, ArchiveError, DownloadError, PlaylistError, ValueError) as exc:
         logger.error('%s', exc)
         return 1

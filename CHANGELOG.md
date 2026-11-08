@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-08
+
+### Added
+
+- `soundsave backup` writes incremental, uncompressed ZIP archives of tracks
+  added or modified since the previous run. The first run takes the cutoff date
+  with `--since`; later runs read it from `state.json` in `BACKUP_DIR`. Removed
+  tracks are listed in `deleted.txt` inside the archive.
+
 ## [3.0.0] - 2026-11-07
 
 ### Added

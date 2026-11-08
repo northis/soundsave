@@ -61,6 +61,7 @@ class Config:
     music_dir: Path | None = None
     main_playlist: str | None = None
     data_dir: Path | None = None
+    backup_dir: Path = Path('backup')
     web_host: str = '127.0.0.1'
     web_port: int = 8765
     max_downloads: int = 20
@@ -112,6 +113,8 @@ class Config:
 
         data_raw = _env('DATA_DIR')
         data_dir = Path(data_raw).expanduser() if data_raw else target_dir / '.soundsave'
+        backup_raw = _env('BACKUP_DIR')
+        backup_dir = Path(backup_raw).expanduser() if backup_raw else Path('backup')
         web_port = _parse_int('SOUNDSAVE_PORT', _env('SOUNDSAVE_PORT'), default=8765)
 
         max_downloads = _parse_int(
@@ -153,6 +156,7 @@ class Config:
             music_dir_configured=music_raw is not None,
             main_playlist=main_playlist,
             data_dir=data_dir,
+            backup_dir=backup_dir,
             web_host=_env('SOUNDSAVE_HOST', default='127.0.0.1') or '127.0.0.1',
             web_port=web_port,
             max_downloads=max_downloads,

@@ -78,6 +78,7 @@ All settings live in `.env` (or in the environment). See
 | `MAIN_PLAYLIST` | with `MUSIC_DIR` | Folder name of the one playlist that gets the sync button; empty for a flat library |
 | `TARGET_DIR` | no | Explicit archive folder; overrides `MUSIC_DIR` + `MAIN_PLAYLIST` |
 | `DATA_DIR` | no | SQLite index and cover cache (default `.soundsave` in the main playlist locally; Compose mounts it at `/app/data`) |
+| `BACKUP_DIR` | no | Folder for incremental track archives (default `backup` in the working directory) |
 | `SOUNDSAVE_HOST`, `SOUNDSAVE_PORT` | no | Web player bind address/port (default `127.0.0.1:8765`) |
 | `SOUNDSAVE_BIND_ADDR` | Docker only | Published interface (default `0.0.0.0`) |
 | `ZVUK_TOKEN` | for the `sync` fallback, `audit` and `upgrade --source zvuk` (the default) | Zvuk token from `https://zvuk.com/api/tiny/profile` |
@@ -156,6 +157,10 @@ soundsave scan --playlist Chill --covers
 # Copy the web library database to DATA_DIR/backups
 soundsave snapshot --label manual
 
+# Back up tracks changed since the previous run (the first run sets the date)
+soundsave backup --since 2026-01-01
+soundsave backup
+
 # Export a foobar2000 playlist for a container or a portable player
 soundsave export "D:\Music\Playlists\Road trip.fpl" --output "D:\Export\Road trip"
 ```
@@ -165,6 +170,19 @@ only returns a lower bitrate, it searches Zvuk and uses the best 320 kbps
 stream there. If Zvuk has no confident match or cannot provide 320 kbps, the
 best Yandex stream is used as a fallback. Without `ZVUK_TOKEN`, `sync` works
 from Yandex Music only.
+
+### Track backups
+
+`soundsave backup` writes an incremental ZIP archive to `BACKUP_DIR` for the
+tracks under `MUSIC_DIR` (or `TARGET_DIR`). The first run needs
+`--since YYYY-MM-DD`: only files modified after that date are included. The
+run time is stored in `state.json` next to the archives, and later runs use it
+as the cutoff. Files added or modified after it are packed without compression;
+paths keep their library-relative layout (`Main/0001. Artist - Title.mp3`). When
+files known to the previous backup are gone, the archive also contains
+`deleted.txt` with one path per line. The list is omitted on the first backup
+and when nothing was deleted. A run with no changes and no deletions writes no
+archive but still records the date.
 
 ### Quality policies
 
