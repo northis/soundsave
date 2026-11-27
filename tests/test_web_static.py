@@ -102,7 +102,7 @@ def test_service_worker_caches_shell_and_audio() -> None:
     player = (STATIC / 'player.js').read_text(encoding='utf-8')
     cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
 
-    assert 'soundsave-shell-v21' in worker
+    assert 'soundsave-shell-v22' in worker
     assert 'soundsave-audio-v1' in worker
     assert "download') === '1'" in worker
     assert "stream') === '1'" in worker
@@ -126,6 +126,20 @@ def test_service_worker_caches_shell_and_audio() -> None:
     assert 'loadBlob: loadTrackBlob' in (STATIC / 'app.js').read_text(encoding='utf-8')
     assert 'cancelActive' in cache
     assert "visibilityState !== 'visible'" in cache
+
+
+def test_expired_access_session_opens_the_login_page() -> None:
+    app = (STATIC / 'app.js').read_text(encoding='utf-8')
+    cache = (STATIC / 'cache.js').read_text(encoding='utf-8')
+    worker = (STATIC / 'sw.js').read_text(encoding='utf-8')
+
+    # Access answers 401 only to AJAX requests; the page then opens `/login`,
+    # which the service worker leaves to the network.
+    assert app.count("'X-Requested-With': 'XMLHttpRequest'") == 2
+    assert "'X-Requested-With': 'XMLHttpRequest'" in cache
+    assert "location.assign('/login')" in app
+    assert "location.assign('/login')" in cache
+    assert "url.pathname === '/login'" in worker
 
 
 def test_user_pause_wins_over_resume_when_the_page_becomes_visible() -> None:

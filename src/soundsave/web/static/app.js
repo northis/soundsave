@@ -1,8 +1,8 @@
-import { Player } from './player.js?v=3.2.0';
-import { CacheManager, formatBytes } from './cache.js?v=3.2.0';
-import { diag, diagClear, diagText, watchAudio } from './diag.js?v=3.2.0';
+import { Player } from './player.js?v=3.2.1';
+import { CacheManager, formatBytes } from './cache.js?v=3.2.1';
+import { diag, diagClear, diagText, watchAudio } from './diag.js?v=3.2.1';
 
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '3.2.1';
 
 const $ = (id) => document.getElementById(id);
 const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
@@ -73,7 +73,9 @@ function toast(message, { error = false, timeout = 4500 } = {}) {
 }
 
 async function api(path, { method = 'GET', body } = {}) {
-  const headers = {};
+  // Access answers 401 instead of a login redirect only to AJAX requests, so
+  // an ended session must not look like a failed request.
+  const headers = { 'X-Requested-With': 'XMLHttpRequest' };
   if (method !== 'GET') headers['X-Soundsave-Request'] = '1';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(path, {
@@ -82,6 +84,7 @@ async function api(path, { method = 'GET', body } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: 'same-origin',
   });
+  if (response.status === 401) return login();
   let data = null;
   try { data = await response.json(); } catch (error) { /* empty body */ }
   if (!response.ok) {
@@ -91,6 +94,13 @@ async function api(path, { method = 'GET', body } = {}) {
     throw failure;
   }
   return data;
+}
+
+// The Cloudflare Access session has ended: `/login` is protected by Access and
+// is not cached by the service worker, so its login page appears.
+function login() {
+  location.assign('/login');
+  throw new Error('Требуется вход в Cloudflare Access');
 }
 
 /* ----------------------------- theme ----------------------------- */
@@ -789,8 +799,10 @@ async function loadTrackBlob(track, signal) {
   const separator = track.audio_url.includes('?') ? '&' : '?';
   const response = await fetch(`${track.audio_url}${separator}stream=1`, {
     credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
+  if (response.status === 401) login();
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const blob = await response.blob();
   if (!blob.size || !/^audio\//.test(blob.type || 'audio/')) throw new Error('Not audio');

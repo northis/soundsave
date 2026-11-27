@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-11-27
+
+### Fixed
+
+- The web player sends `X-Requested-With: XMLHttpRequest` with its own requests,
+  so Cloudflare Access answers 401 when the Access session ends. On that 401 the
+  player opens the new `/login` route, which Access protects, and the Access
+  login page appears instead of a failed track download.
+
 ## [3.2.0] - 2026-11-08
 
 ### Added

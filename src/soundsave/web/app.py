@@ -11,7 +11,7 @@ from typing import Annotated
 from urllib.parse import quote, urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from ..config import Config
@@ -149,6 +149,14 @@ def create_app(config: Config, settings: WebSettings | None = None) -> FastAPI:
     @app.get('/')
     def index() -> FileResponse:
         return FileResponse(STATIC / 'index.html', media_type='text/html', headers={'Cache-Control': 'no-cache'})
+
+    # The player opens this path when Cloudflare Access reports an ended
+    # session. Access must protect it and the service worker must not cache it,
+    # so an expired session always reaches the Access login page; after the
+    # login Access returns here and the browser continues to the library.
+    @app.get('/login')
+    def login() -> RedirectResponse:
+        return RedirectResponse('/', status_code=302)
 
     # PWA assets that Cloudflare Access bypasses must be reachable without a
     # query string: some Access rules compare the full URL, and a redirect to

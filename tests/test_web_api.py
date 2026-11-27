@@ -366,3 +366,10 @@ def test_pwa_assets_are_served(root: Path) -> None:
         icon_svg = client.get('/favicon.svg')
         assert icon_svg.status_code == 200
         assert icon_svg.headers['content-type'] == 'image/svg+xml'
+
+
+def test_login_returns_to_the_library(root: Path) -> None:
+    with make_client(root) as client:
+        response = client.get('/login', follow_redirects=False)
+        assert response.status_code == 302
+        assert response.headers['location'] == '/'

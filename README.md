@@ -470,9 +470,17 @@ check that the Access application has a Bypass policy for exactly these paths
 (and `/sw.js` if your proxy blocks it) and that no Worker in front of the
 container requires the JWT for them.
 
-Do not bypass `/api/*` or `/audio`; those remain behind Access. PWA installation
-requires HTTPS (or localhost); a plain `http://LAN-IP:8765` is not a secure
-context. iOS has stricter background-audio and storage limits.
+When the Access session ends while the player is open, the app asks Access to
+answer its own requests with 401: the `X-Requested-With: XMLHttpRequest` header
+makes Access reply 401 instead of a login redirect that the page cannot follow.
+On that 401 the app opens `/login`. Access protects this path and the service
+worker does not cache it, so the Access login page appears; after the login
+Access returns to `/login` and the browser goes back to the library. Do not
+bypass `/login`.
+
+Do not bypass `/api/*`, `/login` or `/audio`; those remain behind Access. PWA
+installation requires HTTPS (or localhost); a plain `http://LAN-IP:8765` is not
+a secure context. iOS has stricter background-audio and storage limits.
 
 Local development:
 

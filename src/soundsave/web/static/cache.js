@@ -166,8 +166,12 @@ export class CacheManager {
       const response = await fetch(`${url}${separator}download=1`, {
         credentials: 'same-origin',
         cache: 'no-store',
+        // Access answers 401 instead of a login redirect only to AJAX requests.
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         signal: controller.signal,
       });
+      // The Access session has ended; app.js sends the browser to `/login`.
+      if (response.status === 401) location.assign('/login');
       const type = response.headers.get('content-type') || '';
       if (!response.ok || !type.startsWith('audio/')) {
         throw new Error(`HTTP ${response.status}: не удалось скачать трек`);

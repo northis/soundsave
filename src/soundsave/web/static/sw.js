@@ -1,6 +1,6 @@
 /* Soundsave service worker: app shell, API fallback, covers and audio cache. */
 
-const SHELL_CACHE = 'soundsave-shell-v21';
+const SHELL_CACHE = 'soundsave-shell-v22';
 const AUDIO_CACHE = 'soundsave-audio-v1';
 const COVER_CACHE = 'soundsave-covers-v2';
 const API_CACHE = 'soundsave-api-v1';
@@ -8,11 +8,11 @@ const KEEP = new Set([SHELL_CACHE, AUDIO_CACHE, COVER_CACHE, API_CACHE]);
 
 const PRECACHE = [
   '/',
-  '/static/style.css?v=3.2.0',
-  '/static/app.js?v=3.2.0',
-  '/static/player.js?v=3.2.0',
-  '/static/cache.js?v=3.2.0',
-  '/static/diag.js?v=3.2.0',
+  '/static/style.css?v=3.2.1',
+  '/static/app.js?v=3.2.1',
+  '/static/player.js?v=3.2.1',
+  '/static/cache.js?v=3.2.1',
+  '/static/diag.js?v=3.2.1',
   '/favicon.svg',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
@@ -183,6 +183,9 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
+    // `/login` must reach Cloudflare Access instead of the cached shell: the
+    // app opens it when the Access session has ended.
+    if (url.pathname === '/login') return;
     event.respondWith(cacheFirst(new Request('/')).catch(async () => {
       const cached = await caches.match('/');
       return cached || new Response('Нет сети', { status: 503 });
